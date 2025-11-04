@@ -372,7 +372,11 @@ data class GameState(
     
     /**
      * Advances the game time by a specified amount and returns updated state.
-     * This method creates a new GameState with the updated time and can trigger timeline events.
+     * This method creates a new GameState with the updated time.
+     * 
+     * Note: This method does not automatically process timeline events.
+     * Use [advanceTimeWithEvents] to automatically detect and return triggered events,
+     * or use [getTriggeredEventsBetween] after advancing time to check for events.
      * 
      * @param minutes The number of minutes to advance the game time.
      * @return A new GameState instance with the time advanced. The time cannot exceed the timeline endTime.
@@ -386,6 +390,248 @@ data class GameState(
             newTime
         }
         return copy(currentTime = finalTime)
+    }
+    
+    /**
+     * Advances the game time and detects all timeline events that are triggered during the time advancement.
+     * 
+     * @param minutes The number of minutes to advance the game time.
+     * @return A [TimeAdvanceResult] containing the updated GameState and a list of triggered TimelineEvents.
+     */
+    fun advanceTimeWithEvents(minutes: Int): TimeAdvanceResult {
+        val oldTime = currentTime
+        val newState = advanceTime(minutes)
+        val triggeredEvents = newState.getTriggeredEventsBetween(oldTime, newState.currentTime)
+        return TimeAdvanceResult(newState, triggeredEvents)
+    }
+    
+    /**
+     * Gets all timeline events that occur between two time points.
+     * Events that occur exactly at the start time are included, but events at the end time are excluded.
+     * This allows checking for events that would trigger when advancing from oldTime to newTime.
+     * 
+     * @param oldTime The starting time point.
+     * @param newTime The ending time point (exclusive).
+     * @return A list of TimelineEvents that occur between oldTime (inclusive) and newTime (exclusive).
+     */
+    fun getTriggeredEventsBetween(oldTime: GameTime, newTime: GameTime): List<TimelineEvent> {
+        return timeline.events.filter { event ->
+            val eventMinutes = event.time.minutes
+            // Include events that occur at or after oldTime, but before newTime
+            eventMinutes >= oldTime.minutes && eventMinutes < newTime.minutes
+        }.sortedBy { it.time.minutes }
+    }
+    
+    /**
+     * Gets all timeline events that would be triggered when advancing time by a specified amount.
+     * This is a convenience method that calculates the new time and finds events between current and new time.
+     * 
+     * @param minutes The number of minutes to advance.
+     * @return A list of TimelineEvents that would trigger during the time advancement.
+     */
+    fun getEventsForTimeAdvance(minutes: Int): List<TimelineEvent> {
+        val newTime = currentTime.addMinutes(minutes)
+        val finalTime = if (newTime.minutes > timeline.endTime.minutes) {
+            timeline.endTime
+        } else {
+            newTime
+        }
+        return getTriggeredEventsBetween(currentTime, finalTime)
+    }
+    
+    /**
+     * Result of advancing time, containing the updated state and triggered events.
+     * 
+     * @param newState The GameState with time advanced.
+     * @param triggeredEvents List of TimelineEvents that were triggered during the time advancement.
+     */
+    data class TimeAdvanceResult(
+        val newState: GameState,
+        val triggeredEvents: List<TimelineEvent>
+    )
+    
+    /**
+     * Performs an action and automatically advances time based on the action's time cost.
+     * This is a convenience method that combines action time calculation with time advancement.
+     * 
+     * @param actionType The type of action being performed.
+     * @return A [TimeAdvanceResult] containing the updated GameState and triggered events.
+     */
+    fun performActionWithTime(actionType: ActionTimeCosts.ActionType): TimeAdvanceResult {
+        val timeCost = ActionTimeCosts.getActionTime(actionType)
+        return advanceTimeWithEvents(timeCost)
+    }
+    
+    /**
+     * Performs a movement action and automatically advances time based on distance.
+     * 
+     * @param from The starting place.
+     * @param to The destination place.
+     * @return A [TimeAdvanceResult] containing the updated GameState and triggered events.
+     */
+    fun performMovementWithTime(from: Place, to: Place): TimeAdvanceResult {
+        val timeCost = ActionTimeCosts.getMovementTime(from, to)
+        return advanceTimeWithEvents(timeCost)
+    }
+    
+    /**
+     * Performs a movement action and automatically advances time based on distance.
+     * 
+     * @param distance The distance between places (in distance units).
+     * @return A [TimeAdvanceResult] containing the updated GameState and triggered events.
+     */
+    fun performMovementWithTime(distance: Int): TimeAdvanceResult {
+        val timeCost = ActionTimeCosts.getMovementTime(distance)
+        return advanceTimeWithEvents(timeCost)
+    }
+    
+    /**
+     * Processes a list of timeline events and applies their effects to the game state.
+     * This is a basic implementation that handles common event types.
+     * Complex event processing may require LLM 5 (Component Updater) for dynamic updates.
+     * 
+     * @param events The list of TimelineEvents to process.
+     * @return A new GameState with event effects applied.
+     */
+    fun processTimelineEvents(events: List<TimelineEvent>): GameState {
+        var updatedState = this
+        
+        events.forEach { event ->
+            updatedState = updatedState.processSingleEvent(event)
+        }
+        
+        return updatedState
+    }
+    
+    /**
+     * Processes a single timeline event and applies its effects to the game state.
+     * 
+     * @param event The TimelineEvent to process.
+     * @return A new GameState with the event's effects applied.
+     */
+    private fun processSingleEvent(event: TimelineEvent): GameState {
+        return when (event.eventType) {
+            TimelineEvent.EventType.CHARACTER_MOVEMENT -> {
+                processCharacterMovement(event)
+            }
+            TimelineEvent.EventType.CLUE_AVAILABILITY -> {
+                processClueAvailability(event)
+            }
+            TimelineEvent.EventType.EVIDENCE_DESTRUCTION -> {
+                processEvidenceDestruction(event)
+            }
+            TimelineEvent.EventType.CHARACTER_ACTION -> {
+                processCharacterAction(event)
+            }
+            TimelineEvent.EventType.PLACE_CHANGE -> {
+                processPlaceChange(event)
+            }
+            TimelineEvent.EventType.CUSTOM -> {
+                processCustomEvent(event)
+            }
+        }
+    }
+    
+    /**
+     * Processes a character movement event.
+     * Moves the character to the new location specified in the event.
+     * 
+     * @param event The character movement event.
+     * @return Updated GameState with character moved.
+     */
+    private fun processCharacterMovement(event: TimelineEvent): GameState {
+        val characterId = event.characterId ?: return this
+        val newLocation = event.placeId ?: return this
+        
+        val character = getCharacter(characterId) ?: return this
+        val updatedCharacter = character.copy(currentLocation = newLocation)
+        
+        return updateCharacter(updatedCharacter)
+    }
+    
+    /**
+     * Processes a clue availability event.
+     * Currently sets a flag to indicate clue availability changed.
+     * Full implementation may require adding/removing clues from places.
+     * 
+     * @param event The clue availability event.
+     * @return Updated GameState with clue availability flags updated.
+     */
+    private fun processClueAvailability(event: TimelineEvent): GameState {
+        // Set flag indicating clue availability changed
+        val flagKey = "clue_availability_${event.id}"
+        return updateFlag(flagKey, true)
+    }
+    
+    /**
+     * Processes an evidence destruction event.
+     * Removes clues from the game state if they are specified in affectedComponents.
+     * 
+     * @param event The evidence destruction event.
+     * @return Updated GameState with destroyed clues removed.
+     */
+    private fun processEvidenceDestruction(event: TimelineEvent): GameState {
+        var updatedState = this
+        
+        // Remove clues specified in affectedComponents
+        event.affectedComponents.forEach { clueId ->
+            updatedState = updatedState.removeClue(clueId)
+        }
+        
+        // Set flag indicating evidence was destroyed
+        val flagKey = "evidence_destroyed_${event.id}"
+        return updatedState.updateFlag(flagKey, true)
+    }
+    
+    /**
+     * Processes a character action event.
+     * Sets flags based on the action described in the event.
+     * 
+     * @param event The character action event.
+     * @return Updated GameState with action flags set.
+     */
+    private fun processCharacterAction(event: TimelineEvent): GameState {
+        // Set flag for character action
+        val flagKey = "character_action_${event.characterId}_${event.id}"
+        return updateFlag(flagKey, true)
+    }
+    
+    /**
+     * Processes a place change event.
+     * Sets flags to indicate place state has changed.
+     * 
+     * @param event The place change event.
+     * @return Updated GameState with place change flags set.
+     */
+    private fun processPlaceChange(event: TimelineEvent): GameState {
+        // Set flag for place change
+        val flagKey = "place_changed_${event.placeId}_${event.id}"
+        return updateFlag(flagKey, true)
+    }
+    
+    /**
+     * Processes a custom event.
+     * Sets generic flags for custom events.
+     * 
+     * @param event The custom event.
+     * @return Updated GameState with custom event flags set.
+     */
+    private fun processCustomEvent(event: TimelineEvent): GameState {
+        // Set flag for custom event
+        val flagKey = "custom_event_${event.id}"
+        return updateFlag(flagKey, true)
+    }
+    
+    /**
+     * Advances time and automatically processes all triggered timeline events.
+     * This is a convenience method that combines time advancement with event processing.
+     * 
+     * @param minutes The number of minutes to advance the game time.
+     * @return A new GameState with time advanced and all triggered events processed.
+     */
+    fun advanceTimeAndProcessEvents(minutes: Int): GameState {
+        val result = advanceTimeWithEvents(minutes)
+        return result.newState.processTimelineEvents(result.triggeredEvents)
     }
     
     /**
