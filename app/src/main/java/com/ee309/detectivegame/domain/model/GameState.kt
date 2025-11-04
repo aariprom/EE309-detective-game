@@ -1,5 +1,6 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -7,6 +8,7 @@ import kotlinx.serialization.Serializable
  * This class is used to store the complete game state.
  * These methods will be called from the GameViewModel to get the current game state.
  */
+@OptIn(InternalSerializationApi::class)
 @Serializable
 data class GameState(
     val phase: GamePhase = GamePhase.START,
@@ -234,6 +236,186 @@ data class GameState(
      */
     fun updateTimeline(newTimeline: Timeline): GameState {
         return copy(timeline = newTimeline)
+    }
+    
+    // Game logic helper methods
+    
+    /**
+     * Gets all characters that are unlocked based on current game flags.
+     * Characters are unlocked when all their unlockConditions are satisfied (flags are true).
+     * 
+     * @return A list of characters that are currently unlocked. Returns all characters if no unlock conditions exist.
+     */
+    fun getUnlockedCharacters(): List<Character> {
+        return characters.filter { it.isUnlocked(flags) }
+    }
+    
+    /**
+     * Gets all places that are unlocked based on current game flags.
+     * Places are unlocked when all their unlockConditions are satisfied (flags are true).
+     * 
+     * @return A list of places that are currently unlocked. Returns all places if no unlock conditions exist.
+     */
+    fun getUnlockedPlaces(): List<Place> {
+        return places.filter { it.isUnlocked(flags) }
+    }
+    
+    /**
+     * Gets all characters that are available (visible and unlocked).
+     * A character is available if it's not hidden and all its unlock conditions are met.
+     * 
+     * @return A list of characters that are visible and unlocked. Returns empty list if no characters are available.
+     */
+    fun getAvailableCharacters(): List<Character> {
+        return getUnlockedCharacters().filter { !it.hidden }
+    }
+    
+    /**
+     * Checks if the time limit has been exceeded.
+     * The time limit is defined by the timeline's endTime.
+     * 
+     * @return true if currentTime is after or equal to timeline endTime, false otherwise.
+     */
+    fun isTimeLimitExceeded(): Boolean {
+        return currentTime.minutes >= timeline.endTime.minutes
+    }
+    
+    /**
+     * Gets the player's current location as a Place object.
+     * 
+     * @return The Place object for the player's current location, or null if location is not set or doesn't exist.
+     */
+    fun getCurrentLocation(): Place? {
+        return if (player.currentLocation.isNotEmpty()) {
+            getPlace(player.currentLocation)
+        } else {
+            null
+        }
+    }
+    
+    /**
+     * Gets all characters at the player's current location.
+     * Convenience method that combines getCurrentLocation() and getCharactersAtLocation().
+     * 
+     * @return A list of characters at the player's current location. Returns empty list if player has no location or no characters are present.
+     */
+    fun getCharactersAtCurrentLocation(): List<Character> {
+        val currentLocation = getCurrentLocation() ?: return emptyList()
+        return getCharactersAtLocation(currentLocation.id)
+    }
+    
+    /**
+     * Gets all places connected to the player's current location.
+     * 
+     * @return A list of Place objects that are connected to the current location. Returns empty list if player has no location or no connected places exist.
+     */
+    fun getNearbyPlaces(): List<Place> {
+        val currentLocation = getCurrentLocation() ?: return emptyList()
+        return currentLocation.connectedPlaces
+            .mapNotNull { placeId -> getPlace(placeId) }
+            .filter { it.isUnlocked(flags) }
+    }
+    
+    /**
+     * Gets all timeline events that occur at the current game time.
+     * 
+     * @return A list of TimelineEvent objects scheduled for the current time. Returns empty list if no events occur at this time.
+     */
+    fun getTimelineEventsAtCurrentTime(): List<TimelineEvent> {
+        return timeline.getEventsAtTime(currentTime)
+    }
+    
+    /**
+     * Checks if the game can progress to a specific phase.
+     * This is a basic validation method. More complex validation logic can be added later.
+     * 
+     * @param newPhase The phase to check progression to.
+     * @return true if the phase transition is valid, false otherwise. Basic implementation allows progression forward through phases.
+     */
+    fun canProgressToPhase(newPhase: GamePhase): Boolean {
+        // Basic phase progression validation
+        // Allow progression: START -> TUTORIAL -> INTRODUCTION -> INVESTIGATION -> GAME_OVER/WIN/LOSE
+        return when {
+            phase == GamePhase.START -> newPhase == GamePhase.TUTORIAL
+            phase == GamePhase.TUTORIAL -> newPhase == GamePhase.INTRODUCTION
+            phase == GamePhase.INTRODUCTION -> newPhase == GamePhase.INVESTIGATION
+            phase == GamePhase.INVESTIGATION -> newPhase in listOf(GamePhase.GAME_OVER, GamePhase.WIN, GamePhase.LOSE)
+            phase in listOf(GamePhase.GAME_OVER, GamePhase.WIN, GamePhase.LOSE) -> false // Cannot progress from end states
+            else -> false
+        }
+    }
+    
+    /**
+     * Checks win/lose conditions for the game.
+     * This is a basic implementation. More complex logic can be added based on game rules.
+     * 
+     * @return A GameResult indicating the game status. Returns null if game is still in progress.
+     */
+    fun checkWinConditions(): GameResult? {
+        // Check if time limit exceeded
+        if (isTimeLimitExceeded()) {
+            return GameResult.LOSE // Time ran out
+        }
+        
+        // Check if player has accused someone (if accusation system is implemented)
+        // This would typically check if player has made an accusation and if it's correct
+        
+        // Check if player has collected enough clues (if clue-based win condition exists)
+        // This would check if player has collected all required clues
+        
+        // For now, return null indicating game is still in progress
+        // Win/lose conditions should be checked when player makes an accusation
+        return null
+    }
+    
+    // Time management methods
+    
+    /**
+     * Advances the game time by a specified amount and returns updated state.
+     * This method creates a new GameState with the updated time and can trigger timeline events.
+     * 
+     * @param minutes The number of minutes to advance the game time.
+     * @return A new GameState instance with the time advanced. The time cannot exceed the timeline endTime.
+     */
+    fun advanceTime(minutes: Int): GameState {
+        val newTime = currentTime.addMinutes(minutes)
+        // Ensure time doesn't exceed timeline end time
+        val finalTime = if (newTime.minutes > timeline.endTime.minutes) {
+            timeline.endTime
+        } else {
+            newTime
+        }
+        return copy(currentTime = finalTime)
+    }
+    
+    /**
+     * Gets the remaining time until the game ends.
+     * 
+     * @return A GameTime object representing the remaining time. Returns GameTime(0) if time limit has been exceeded.
+     */
+    fun getRemainingTime(): GameTime {
+        val remaining = timeline.endTime.minutes - currentTime.minutes
+        return GameTime(maxOf(0, remaining))
+    }
+    
+    /**
+     * Gets the percentage of time that has elapsed.
+     * 
+     * @return A value between 0.0 and 1.0 representing the percentage of time elapsed. Returns 1.0 if time limit exceeded.
+     */
+    fun getTimeProgress(): Double {
+        val totalDuration = timeline.endTime.minutes - timeline.startTime.minutes
+        if (totalDuration <= 0) return 1.0
+        val elapsed = currentTime.minutes - timeline.startTime.minutes
+        return (elapsed.toDouble() / totalDuration).coerceIn(0.0, 1.0)
+    }
+    
+    /**
+     * Represents the result of checking game win/lose conditions.
+     */
+    enum class GameResult {
+        WIN,  // Player won
+        LOSE  // Player lost
     }
 }
 
