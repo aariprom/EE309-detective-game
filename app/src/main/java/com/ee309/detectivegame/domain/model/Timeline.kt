@@ -1,8 +1,11 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Represents the game timeline with past and future events
  */
+@Serializable
 data class Timeline(
     val startTime: GameTime,
     val endTime: GameTime,

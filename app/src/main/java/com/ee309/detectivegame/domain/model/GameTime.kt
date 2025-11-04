@@ -1,8 +1,11 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Represents game time with 5-minute minimum unit
  */
+@Serializable
 data class GameTime(
     val minutes: Int = 0
 ) {
