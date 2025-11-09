@@ -1,11 +1,8 @@
 package com.ee309.detectivegame.domain.model
 
-import kotlinx.serialization.Serializable
-
 /**
  * Represents a location/place in the game
  */
-@Serializable
 data class Place(
     val id: String,
     val name: String,

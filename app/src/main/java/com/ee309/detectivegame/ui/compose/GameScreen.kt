@@ -33,8 +33,7 @@ fun GameScreen(
             }
             
             is GameUiState.Success -> {
-                val successState = uiState as GameUiState.Success
-                val gameState = successState.gameState
+                val gameState = uiState.gameState
                 Text(
                     text = "Detective Game",
                     style = MaterialTheme.typography.headlineLarge
@@ -58,9 +57,8 @@ fun GameScreen(
             }
             
             is GameUiState.Error -> {
-                val errorState = uiState as GameUiState.Error
                 Text(
-                    text = "Error: ${errorState.message}",
+                    text = "Error: ${uiState.message}",
                     color = MaterialTheme.colorScheme.error
                 )
                 Spacer(modifier = Modifier.height(16.dp))

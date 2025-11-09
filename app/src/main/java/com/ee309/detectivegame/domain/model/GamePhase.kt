@@ -1,11 +1,8 @@
 package com.ee309.detectivegame.domain.model
 
-import kotlinx.serialization.Serializable
-
 /**
  * Represents the current phase of the game
  */
-@Serializable
 enum class GamePhase {
     START, // Initial state
     TUTORIAL, // Tutorial phase
