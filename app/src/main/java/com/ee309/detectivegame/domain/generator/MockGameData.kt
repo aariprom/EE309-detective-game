@@ -45,7 +45,7 @@ object MockGameData {
         
         // Create initial game state
         return GameState(
-            phase = GamePhase.INVESTIGATION,
+            phase = GamePhase.START,
             currentTime = GameTime(0), // Start at 00:00
             player = player,
             characters = characters,
