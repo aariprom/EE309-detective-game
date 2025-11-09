@@ -4,17 +4,15 @@ An Android-based interactive detective game with LLM-powered dynamic content gen
 
 ## 🎓 New to Kotlin/Android?
 
-**Start here**: [docs/BEGINNER_GUIDE.md](./docs/BEGINNER_GUIDE.md) - Complete beginner-friendly explanation!
-
-Or jump to: [docs/QUICK_START.md](./docs/QUICK_START.md) - Quick setup guide for complete beginners
+**Start here**: [docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md) - Complete beginner-friendly guide with setup instructions!
 
 ## Project Documentation
 
+- **[docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md)**: Complete beginner guide with setup instructions
 - **[docs/PROJECT_BREAKDOWN.md](./docs/PROJECT_BREAKDOWN.md)**: Detailed module breakdown with task descriptions, priorities, difficulties, and feasibility assessments
 - **[docs/TASK_SUMMARY.md](./docs/TASK_SUMMARY.md)**: Quick reference table with task dependencies and development phases
 - **[docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md)**: Detailed explanation of the Hybrid LLM Architecture approach
-- **[docs/TECH_STACK.md](./docs/TECH_STACK.md)**: Comprehensive tech stack recommendations with alternatives and rationale
-- **[docs/README_SETUP.md](./docs/README_SETUP.md)**: Detailed setup instructions
+- **[docs/TECH_STACK.md](./docs/TECH_STACK.md)**: Tech stack documentation (matches actual build configuration)
 
 ## Project Structure
 
@@ -40,5 +38,5 @@ The project is divided into 5 main modules:
 - **Networking**: Retrofit + OkHttp
 - **Database**: Room Database
 - **LLM**: Upstage API (Solar LLM) - Partnership support
-- **JSON**: kotlinx.serialization
+- **JSON**: Gson (Retrofit) + kotlinx.serialization (Domain models)
 - **Async**: Kotlin Coroutines
