@@ -1,8 +1,11 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Represents an event in the timeline
  */
+@Serializable
 data class TimelineEvent(
     val id: String,
     val time: GameTime,
@@ -13,6 +16,7 @@ data class TimelineEvent(
     val action: String? = null, // What action happens (e.g., "destroy_evidence")
     val affectedComponents: List<String> = emptyList() // IDs of affected components
 ) {
+    @Serializable
     enum class EventType {
         CHARACTER_ACTION, // Character does something
         PLACE_CHANGE, // Place state changes
