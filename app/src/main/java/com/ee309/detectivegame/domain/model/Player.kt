@@ -1,11 +1,8 @@
 package com.ee309.detectivegame.domain.model
 
-import kotlinx.serialization.Serializable
-
 /**
  * Represents the player character
  */
-@Serializable
 data class Player(
     val name: String = "Detective",
     val currentLocation: String = "",
