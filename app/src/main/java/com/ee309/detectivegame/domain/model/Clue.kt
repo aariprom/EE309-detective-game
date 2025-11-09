@@ -1,8 +1,11 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Represents a clue in the game
  */
+@Serializable
 data class Clue(
     val id: String,
     val who: String? = null, // Who is involved

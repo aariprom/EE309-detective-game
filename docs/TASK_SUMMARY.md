@@ -163,3 +163,49 @@ To build a playable game, these tasks must be completed in order:
 
 *Note: Timeline assumes 1 developer working part-time. Adjust based on team size and availability.*
 
+---
+
+## Testing Status
+
+### Unit Tests - ✅ All Passing (as of latest check)
+
+**Completed Test Coverage:**
+
+1. **ActionTimeCostsTest.kt** ✅
+   - Time cost calculations
+   - Movement time calculations
+   - Time unit validation
+
+2. **GameTimeTest.kt** ✅
+   - Time operations (addMinutes, isAfter, isBefore, format)
+   - Hours and minutes calculations
+
+3. **GameStateTest.kt** ✅
+   - Query methods (getCharacter, getPlace, getClue, etc.)
+   - Update methods (updateFlag, updateTime, add/update/remove for collections)
+   - Time management methods (advanceTime, event detection, processing)
+   - Game logic helpers (getUnlockedCharacters, canProgressToPhase, etc.)
+
+4. **TimelineTest.kt** ✅
+   - Event query methods (getPastEvents, getFutureEvents, getEventsAtTime)
+   - Upcoming events filtering
+
+5. **CharacterTest.kt** ✅
+   - Helper methods (isUnlocked, isAtLocation)
+
+6. **PlaceTest.kt** ✅
+   - Helper methods (isUnlocked, getDistanceTo)
+
+7. **ClueTest.kt** ✅
+   - Helper methods (isUnlocked)
+   - Property validation
+
+8. **PlayerTest.kt** ✅
+   - Helper methods (hasClue, hasTool, addClue, addTool)
+
+**Test Files Location:** `app/src/test/java/com/ee309/detectivegame/domain/model/`
+
+**Run Tests:** `./gradlew test` or run individual test files from Android Studio
+
+*Note: This status reflects the current state of unit tests for the core domain models. Additional tests will be added as new features are implemented.*
+

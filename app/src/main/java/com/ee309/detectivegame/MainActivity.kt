@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.ee309.detectivegame.ui.compose.GameScreen
 import com.ee309.detectivegame.ui.theme.DetectiveGameTheme
 import dagger.hilt.android.AndroidEntryPoint
 

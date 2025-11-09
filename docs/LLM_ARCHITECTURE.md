@@ -2,242 +2,11 @@
 
 ## Overview
 
-This document explores two architectural approaches for LLM usage in the detective game: **Single LLM (Upfront Generation)** vs. **Chain of LLMs (Lazy Loading)**.
+This document describes the **Hybrid LLM Architecture** chosen for the detective game. This approach combines upfront generation of complete game structure with on-demand generation of dynamic content, providing the best balance of consistency, performance, and user experience.
 
 ---
 
-## Approach 1: Single LLM - Upfront Generation
-
-### Architecture
-
-```
-User Input → Single LLM Call → Complete Game State
-                              ↓
-         [Characters, Places, Clues, Timeline, 
-          All Dialogue, All Descriptions]
-```
-
-### How It Works
-
-1. **Initial Generation (Single Large Call)**
-   - User provides game content/keywords
-   - Single comprehensive LLM call generates:
-     - All characters with full details
-     - All places with full descriptions
-     - All clues with complete information
-     - Complete timeline with all events
-     - Pre-generated dialogue for all possible conversations
-     - All place descriptions and character appearances
-     - All possible action outcomes
-
-2. **Game Runtime**
-   - Game engine reads from pre-generated data
-   - No LLM calls during gameplay
-   - Fast response times
-   - Deterministic experience
-
-### Pros
-
-✅ **Fast Gameplay**: No waiting for LLM responses during play  
-✅ **Consistent Experience**: Same game state every time (replayable)  
-✅ **Lower API Costs**: Single LLM call at game start  
-✅ **Offline Capability**: Once generated, can play without internet  
-✅ **Predictable**: Easier to debug and test  
-✅ **Complete Context**: LLM has full game picture when generating  
-
-### Cons
-
-❌ **Large Initial Call**: May hit token limits or be very expensive  
-❌ **Storage Requirements**: Need to store all pre-generated content  
-❌ **Less Dynamic**: Cannot adapt to unexpected player actions  
-❌ **Memory Limitations**: May forget details across the entire game  
-❌ **Rigid**: Pre-generated dialogue may feel unnatural  
-❌ **Initial Wait Time**: Player waits for long generation at start  
-
----
-
-## Approach 2: Chain of LLMs - Lazy Loading
-
-### Architecture
-
-```
-User Input → LLM 1 (Initializer) → Core Game Structure
-                                    ↓
-                    [Characters, Places, Clues, Timeline - Skeleton Only]
-                                    ↓
-                    ┌───────────────┴───────────────┐
-                    ↓                               ↓
-            LLM 2 (Dialogue)              LLM 3 (Descriptions)
-            On-demand conversations      On-demand place/character details
-                    ↓                               ↓
-            LLM 4 (Action Handler)        LLM 5 (Component Updater)
-            Validates & executes          Updates game state dynamically
-```
-
-### How It Works
-
-1. **Initial Generation (LLM 1 - Initializer)**
-   - User provides game content/keywords
-   - **Skeleton Generation**: Creates structured game framework
-     - Characters (names, traits, is_criminal, basic info)
-     - Places (names, basic traits, connections)
-     - Clues (structured data: who, what, when, where, why)
-     - Timeline (event schedule with structured data)
-   - **NO** full dialogue, descriptions, or detailed content
-
-2. **Runtime Generation (Lazy Loading)**
-   - **LLM 2 - Dialogue Generator**: When player questions a character
-     - Generates conversation on-the-fly
-     - Uses character's traits, known_clues, mental_state
-     - Context-aware (time, player's clues, cooperation level)
-     - Extracts clues from conversation
-   
-   - **LLM 3 - Description Generator**: When player investigates a place or views character
-     - Generates place description with current state
-     - Generates character appearance/expression
-     - Context-aware (time, events, timeline)
-   
-   - **LLM 4 - Action Handler**: When player performs free-form action
-     - Validates action feasibility
-     - Generates action outcome
-     - Updates game state
-   
-   - **LLM 5 - Component Updater**: When timeline events trigger
-     - Updates character states
-     - Updates place states
-     - Generates narrative for events
-     - Updates clue availability
-
-### Pros
-
-✅ **Dynamic & Adaptive**: Content generated based on player's actual path  
-✅ **Natural Conversations**: Dialogue feels more organic and responsive  
-✅ **Lower Initial Cost**: Small initial generation, pay-as-you-go  
-✅ **Memory Efficient**: Each call focuses on specific context  
-✅ **Flexible**: Can handle unexpected player actions  
-✅ **No Token Limits**: Each call is focused and small  
-✅ **Better Context**: Each LLM call has specific, focused context  
-
-### Cons
-
-❌ **Slower Gameplay**: Wait times for LLM responses during play  
-❌ **Higher Total API Costs**: Many LLM calls throughout game  
-❌ **Requires Internet**: Constant connectivity needed  
-❌ **Inconsistent**: Same action might produce different results  
-❌ **Complex State Management**: Need to track what's been generated  
-❌ **Potential Inconsistencies**: Different LLM calls might contradict  
-
----
-
-## Approach 3: Hybrid Approach (Recommended)
-
-### Architecture
-
-```
-User Input → LLM 1 (Initializer) → Core Game Structure
-                                    ↓
-                    [Characters, Places, Clues, Timeline - Full Structure]
-                                    ↓
-                    ┌───────────────┴───────────────┐
-                    ↓                               ↓
-            Pre-generate Some              Lazy Load Dynamic
-            (Templates, Base)              (Dialogue, Adaptations)
-```
-
-### How It Works
-
-1. **Initial Generation (LLM 1 - Comprehensive Initializer)**
-   - Generate complete game structure:
-     - **Characters**: Full details (traits, is_criminal, known_clues, mental_state, items)
-     - **Places**: Full details (traits, available_clues, items, connections)
-     - **Clues**: Complete structured data (who, what, when, where, why, unlock_conditions)
-     - **Timeline**: Complete event schedule with structured data
-   - **NOT** generating:
-     - Full dialogue (too much, too rigid)
-     - Detailed descriptions (better when contextual)
-
-2. **Runtime Generation (Lazy Loading for Dynamic Content)**
-   - **LLM 2 - Dialogue Generator**: Generate conversations on-demand
-   - **LLM 3 - Description Generator**: Generate contextual descriptions
-   - **LLM 4 - Action Handler**: Handle free-form actions
-   - **LLM 5 - Component Updater**: Update states based on timeline/actions
-
-3. **Caching Strategy**
-   - Cache generated dialogue for same character + context
-   - Cache descriptions for same place + time state
-   - Reuse when possible, regenerate when context changes
-
-### Pros
-
-✅ **Best of Both Worlds**: 
-   - Complete game structure upfront (no gaps)
-   - Dynamic content when needed (natural feel)
-   
-✅ **Balanced Costs**: 
-   - Initial generation is manageable
-   - Runtime calls are focused and necessary
-   
-✅ **Predictable Core**: 
-   - Game structure is consistent
-   - Dynamic content adds flavor
-   
-✅ **Good Performance**: 
-   - Most content is cached/pre-generated
-   - Only dynamic interactions need LLM calls
-
-### Cons
-
-⚠️ **Moderate Complexity**: Need to manage both upfront and lazy generation  
-⚠️ **Moderate Costs**: Balance between approaches  
-
----
-
-## Detailed Comparison
-
-### Initial Generation Scope
-
-| Content Type | Single LLM | Chain LLM | Hybrid |
-|--------------|------------|-----------|--------|
-| **Characters (Structure)** | Full | Skeleton | Full |
-| **Places (Structure)** | Full | Skeleton | Full |
-| **Clues (Structure)** | Full | Skeleton | Full |
-| **Timeline** | Full | Skeleton | Full |
-| **Character Dialogue** | Pre-generated | None | None |
-| **Place Descriptions** | Pre-generated | None | None |
-| **Action Outcomes** | Pre-generated | None | None |
-
-### Runtime LLM Calls
-
-| Action | Single LLM | Chain LLM | Hybrid |
-|--------|------------|-----------|--------|
-| **Question Character** | 0 (pre-gen) | 1 (LLM 2) | 1 (LLM 2, cached) |
-| **Investigate Place** | 0 (pre-gen) | 1 (LLM 3) | 1 (LLM 3, cached) |
-| **Free Action** | 0 (pre-gen) | 1 (LLM 4) | 1 (LLM 4) |
-| **Timeline Event** | 0 (pre-gen) | 1 (LLM 5) | 1 (LLM 5) |
-| **Component Update** | 0 (pre-gen) | 1 (LLM 5) | 1 (LLM 5) |
-
-### Cost Estimation (Example: 1-hour game)
-
-**Single LLM:**
-- Initial: 1 large call (~50k tokens) = ~$0.50-1.00
-- Runtime: $0
-- **Total: ~$0.50-1.00**
-
-**Chain LLM:**
-- Initial: 1 small call (~5k tokens) = ~$0.05-0.10
-- Runtime: ~50-100 calls (~2k tokens each) = ~$0.50-2.00
-- **Total: ~$0.55-2.10**
-
-**Hybrid:**
-- Initial: 1 medium call (~20k tokens) = ~$0.20-0.40
-- Runtime: ~30-50 calls (~2k tokens each) = ~$0.30-1.00
-- **Total: ~$0.50-1.40**
-
-*Note: Costs are rough estimates and vary by provider/model*
-
----
-
-## Recommendation: Hybrid Approach
+## Chosen Architecture: Hybrid Approach
 
 ### Why Hybrid?
 
@@ -257,14 +26,305 @@ User Input → LLM 1 (Initializer) → Core Game Structure
    - Not too slow (caching helps)
    - Not too rigid (dynamic content)
 
-### Implementation Strategy
+---
+
+## Architecture Overview
+
+```
+User Input → LLM 1 (Initializer) → Core Game Structure
+                                    ↓
+                    [Characters, Places, Clues, Timeline - Full Structure]
+                                    ↓
+                    ┌───────────────┴───────────────┐
+                    ↓                               ↓
+            Pre-generate Structure      Lazy Load Dynamic Content
+            (Complete game data)        (Dialogue, Descriptions, Actions)
+```
+
+---
+
+## Implementation Details
+
+### Phase 1: Initial Generation (LLM 1 - Comprehensive Initializer)
+
+**When**: Game start, before gameplay begins
+
+**Purpose**: Generate complete game structure from user input/keywords
+
+**Input**:
+- User-provided game content/keywords
+- Game configuration (difficulty, cooperation level, etc.)
+
+**Output**: Complete game structure:
+- **Characters**: Full details (name, traits, is_criminal, known_clues, mental_state, items, unlock_conditions, location)
+- **Places**: Full details (name, traits, available_clues, items, connections, unlock_conditions)
+- **Clues**: Complete structured data (who, what, when, where, why, unlock_conditions)
+- **Timeline**: Complete event schedule with structured data (events, triggers, effects)
+
+**NOT Generating**:
+- Full dialogue (too much, too rigid)
+- Detailed descriptions (better when contextual)
+
+**Technical Requirements**:
+- Use structured output (JSON schema or function calling)
+- Ensure specificity and avoid generic responses
+- Validate output structure and completeness
+
+**Estimated Cost**: ~20k tokens = ~$0.20-0.40 per game
+
+---
+
+### Phase 2: Runtime Generation (Lazy Loading)
+
+#### LLM 2: Dialogue Generator
+
+**When**: Player questions/interrogates a character
+
+**Purpose**: Generate natural, context-aware conversations
+
+**Input**:
+- Character data (traits, known_clues, mental_state, location)
+- Player's collected clues
+- Current game time
+- Player's question/topic
+- Cooperation level (game setting)
+
+**Output**:
+- Character dialogue response
+- Potential new clues (extracted from conversation)
+- Character emotional state update (optional)
+
+**Cache Key**: `character_id + player_clues_hash + time + question_topic`
+
+**Cache Strategy**:
+- Cache for same character + same context (player clues, time)
+- Invalidate when player finds new clues or time advances significantly
+- Store in-memory for session, persistent for save games
+
+**Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per conversation
+
+---
+
+#### LLM 3: Description Generator
+
+**When**: Player investigates a place or views a character
+
+**Purpose**: Generate contextual descriptions based on current game state
+
+**Input**:
+- Place/Character data
+- Current game time
+- Timeline events (past and upcoming)
+- Player's collected clues
+- Recent player actions
+
+**Output**:
+- Place description (appearance, atmosphere, details)
+- Character appearance/expression (if viewing character)
+- Potential clues found (if investigating place)
+- Event descriptions (if timeline events occurred)
+
+**Cache Key**: `place_id/character_id + time + player_clues_hash + events_hash`
+
+**Cache Strategy**:
+- Cache for same place/character + same time state
+- Invalidate when time advances or timeline events occur
+- Store in-memory for session, persistent for save games
+
+**Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per investigation
+
+---
+
+#### LLM 4: Action Handler
+
+**When**: Player performs free-form action
+
+**Purpose**: Validate and execute player's custom actions
+
+**Input**:
+- Action description (player's text input)
+- Current game state
+- Current location
+- Player tools/items
+- Current game time
+
+**Output**:
+- Action validation (feasible/not feasible)
+- Action outcome description
+- State changes (if action succeeds)
+- Time cost (if applicable)
+
+**Cache Key**: `action_hash + game_state_hash` (rarely cached, actions are usually unique)
+
+**Cache Strategy**:
+- Rarely cache (actions are usually unique)
+- Cache common actions (e.g., "look around", "check door")
+- Store in-memory only (not persistent)
+
+**Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per action
+
+---
+
+#### LLM 5: Component Updater
+
+**When**: Timeline events trigger or component state needs update
+
+**Purpose**: Update game components based on timeline events and player actions
+
+**Input**:
+- Timeline event data
+- Current game state
+- Affected components (characters, places, clues)
+- Player's recent actions
+
+**Output**:
+- Updated component states:
+  - Character states (mental_state, known_clues, location)
+  - Place states (available_clues, current_characters)
+  - Clue availability (based on unlock_conditions)
+- Narrative for event
+- State change descriptions
+
+**Cache Key**: `event_id + game_state_hash`
+
+**Cache Strategy**:
+- Cache for same event + same state
+- Invalidate when game state changes significantly
+- Store in-memory for session, persistent for save games
+
+**Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per event
+
+---
+
+## Caching Strategy
+
+### What to Cache
+
+- **Dialogue** (LLM 2): Character conversations
+- **Descriptions** (LLM 3): Place/character descriptions
+- **Action Outcomes** (LLM 4): Common actions (rarely)
+- **Component Updates** (LLM 5): Timeline event outcomes
+
+### Cache Key Structure
+
+```
+LLM 2: "dialogue:{character_id}:{clues_hash}:{time}:{topic}"
+LLM 3: "desc:{place_id}:{time}:{clues_hash}:{events_hash}"
+LLM 4: "action:{action_hash}:{state_hash}"
+LLM 5: "update:{event_id}:{state_hash}"
+```
+
+### Cache Storage
+
+- **In-Memory Cache**: Fast access during session
+  - Use `MutableMap<String, CachedResponse>`
+  - Clear on game restart
+  - Size limit: ~100-200 entries
+
+- **Persistent Cache**: For save games
+  - Store in Room Database
+  - Persist across app restarts
+  - Clear on new game start
+
+### Cache Invalidation
+
+- **Time-based**: When game time advances significantly
+- **Clue-based**: When player finds new clues
+- **Event-based**: When timeline events occur
+- **State-based**: When game state changes significantly
+
+---
+
+## Technical Considerations
+
+### LLM Selection
+
+**Recommended: Upstage API (Solar LLM family)**
+
+- **LLM 1 (Initializer)**: Use larger model (Solar Pro) for complete structure generation
+- **LLM 2-5 (Runtime)**: Use faster/cheaper model (Solar Plus) for runtime generation
+- **Consistency**: Using same model family helps maintain consistency
+
+**Alternatives**: OpenAI GPT-3.5-turbo/GPT-4, Anthropic Claude (fallback)
+
+### Prompt Engineering
+
+#### LLM 1: Initial Content Generator
+- **Focus**: Structured output, completeness, specificity
+- **Format**: JSON schema or function calling
+- **Key**: Avoid generic responses, ensure all fields populated
+
+#### LLM 2: Dialogue Generator
+- **Focus**: Personality consistency, context awareness, natural flow
+- **Format**: JSON with dialogue and extracted clues
+- **Key**: Maintain character voice, respond to player's clues
+
+#### LLM 3: Description Generator
+- **Focus**: Visual detail, contextual relevance, atmosphere
+- **Format**: JSON with description and found clues
+- **Key**: Reflect time, events, and player's knowledge
+
+#### LLM 4: Action Handler
+- **Focus**: Validation logic, game state awareness, creative outcomes
+- **Format**: JSON with validation, outcome, state changes
+- **Key**: Balance flexibility with game integrity
+
+#### LLM 5: Component Updater
+- **Focus**: State consistency, narrative coherence, logical updates
+- **Format**: JSON with updated components and narrative
+- **Key**: Maintain game logic, reflect timeline events
+
+### Error Handling
+
+#### LLM Failures
+- **Retry Logic**: 3 retries with exponential backoff
+- **Fallback Responses**: Default responses if LLM fails
+- **User Feedback**: Show loading indicators, error messages
+
+#### Invalid Output
+- **Validation**: Check output structure and required fields
+- **Default Values**: Use sensible defaults for missing fields
+- **Logging**: Log invalid outputs for debugging
+
+#### Rate Limiting
+- **Queue System**: Queue requests if rate limited
+- **User Feedback**: Show "processing" indicators
+- **Retry**: Automatic retry after rate limit window
+
+#### Timeout
+- **Timeout**: 30 seconds per LLM call
+- **Progress Indicators**: Show loading state
+- **Cancellation**: Allow user to cancel long operations
+
+---
+
+## Cost Estimation
+
+### Per Game Session (1-hour game)
+
+**Initial Generation (LLM 1)**:
+- ~20k tokens = ~$0.20-0.40
+
+**Runtime Generation (LLM 2-5)**:
+- ~30-50 calls × ~2k tokens each = ~$0.30-1.00
+- Caching reduces actual calls by ~30-50%
+
+**Total Estimated Cost**: ~$0.50-1.40 per game session
+
+*Note: Costs are rough estimates and vary by provider/model. Caching significantly reduces costs.*
+
+---
+
+## Implementation Flow
 
 ```
 ┌─────────────────────────────────────────────────┐
 │ Initial Game Setup (LLM 1)                      │
+│ - User provides game content/keywords            │
 │ - Generate complete game structure               │
 │ - All characters, places, clues, timeline        │
 │ - Store in game state                            │
+│ - Validate structure completeness                │
 └─────────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────┐
@@ -272,20 +332,22 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
 │  │ LLM 2: Dialogue Generator                 │  │
+│  │ - Check cache first                       │  │
 │  │ - Called when player questions character  │  │
 │  │ - Input: character data, player clues,    │  │
 │  │          context, player question          │  │
 │  │ - Output: dialogue response, new clues    │  │
-│  │ - Cache: same character + same context    │  │
+│  │ - Cache result                            │  │
 │  └──────────────────────────────────────────┘  │
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
 │  │ LLM 3: Description Generator              │  │
+│  │ - Check cache first                       │  │
 │  │ - Called when player investigates place   │  │
 │  │ - Input: place data, current time,       │  │
 │  │          timeline events, player clues    │  │
 │  │ - Output: place description, clues found  │  │
-│  │ - Cache: same place + same time state    │  │
+│  │ - Cache result                            │  │
 │  └──────────────────────────────────────────┘  │
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
@@ -295,62 +357,72 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 │  │          current location, player tools   │  │
 │  │ - Output: action validation, outcome,     │  │
 │  │          state changes                    │  │
-│  │ - Cache: rarely (actions are unique)     │  │
+│  │ - Cache rarely (actions are unique)     │  │
 │  └──────────────────────────────────────────┘  │
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
 │  │ LLM 5: Component Updater                 │  │
+│  │ - Check cache first                       │  │
 │  │ - Called when timeline event triggers    │  │
 │  │ - Input: timeline event, current state   │  │
 │  │ - Output: updated components, narrative  │  │
-│  │ - Cache: same event + same state         │  │
+│  │ - Cache result                            │  │
 │  └──────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Technical Considerations
+## Alternatives Considered
 
-### LLM Selection
+### Approach 1: Single LLM - Upfront Generation
 
-All approaches can use the same LLM provider, but consider:
+**How It Works**: Single comprehensive LLM call generates everything upfront (including all dialogue and descriptions).
 
-- **Initial Generation**: May need larger context window (GPT-4, Claude)
-- **Runtime Generation**: Can use faster/cheaper models (GPT-3.5, Claude Haiku)
-- **Consistency**: Using same model family helps consistency
+**Pros**:
+- Fast gameplay (no waiting during play)
+- Consistent experience
+- Lower total API costs
+- Offline capability
 
-### Prompt Engineering
+**Cons**:
+- Large initial call (may hit token limits)
+- Less dynamic (cannot adapt to player actions)
+- Rigid dialogue (pre-generated feels unnatural)
+- Initial wait time
 
-- **Initial Generator**: Needs structured output (JSON schema, function calling)
-- **Dialogue Generator**: Needs personality consistency, context awareness
-- **Description Generator**: Needs visual detail, contextual relevance
-- **Action Handler**: Needs validation logic, game state awareness
+**Why Not Chosen**: Too rigid, cannot adapt to player's actual path, dialogue feels unnatural.
 
-### Caching Strategy
+---
 
-- **What to Cache**: Dialogue, descriptions, action outcomes
-- **Cache Key**: Character/Place + Context (time, player clues, etc.)
-- **Cache Invalidation**: When context changes significantly
-- **Storage**: In-memory for session, persistent for save games
+### Approach 2: Chain of LLMs - Pure Lazy Loading
 
-### Error Handling
+**How It Works**: Minimal initial generation (skeleton only), all content generated on-demand.
 
-- **LLM Failures**: Retry logic, fallback responses
-- **Invalid Output**: Validation, default responses
-- **Rate Limiting**: Queue system, user feedback
-- **Timeout**: Progress indicators, cancellation options
+**Pros**:
+- Dynamic and adaptive
+- Natural conversations
+- Lower initial cost
+- Flexible
+
+**Cons**:
+- Slower gameplay (wait times during play)
+- Higher total API costs
+- Requires constant internet
+- Potential inconsistencies
+
+**Why Not Chosen**: Game structure needs to be complete upfront, too many runtime calls, slower user experience.
 
 ---
 
 ## Conclusion
 
-**Recommended: Hybrid Approach**
+The **Hybrid Approach** provides the best balance for the detective game:
 
-- Generate complete game structure upfront (characters, places, clues, timeline)
-- Generate dynamic content on-demand (dialogue, descriptions, actions)
-- Use caching to improve performance and reduce costs
-- Balance between consistency and dynamism
+- ✅ **Complete game structure** upfront (no gaps, predictable core)
+- ✅ **Dynamic content** on-demand (natural feel, contextual)
+- ✅ **Balanced costs** (manageable initial + focused runtime calls)
+- ✅ **Good performance** (caching reduces API calls)
+- ✅ **Flexible** (can adapt to player actions while maintaining structure)
 
-This provides the best user experience while managing costs and complexity effectively.
-
+This architecture ensures a consistent, engaging user experience while managing costs and complexity effectively.
