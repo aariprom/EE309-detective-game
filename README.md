@@ -4,15 +4,16 @@ An Android-based interactive detective game with LLM-powered dynamic content gen
 
 ## 🎓 New to Kotlin/Android?
 
-**Start here**: [docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md) - Complete beginner-friendly guide with setup instructions!
+**Start here**: [BEGINNER_GUIDE.md](./BEGINNER_GUIDE.md) - Complete beginner-friendly explanation!
+
+Or jump to: [QUICK_START.md](./QUICK_START.md) - Quick setup guide
 
 ## Project Documentation
 
-- **[docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md)**: Complete beginner guide with setup instructions
-- **[docs/PROJECT_BREAKDOWN.md](./docs/PROJECT_BREAKDOWN.md)**: Detailed module breakdown with task descriptions, priorities, difficulties, and feasibility assessments
-- **[docs/TASK_SUMMARY.md](./docs/TASK_SUMMARY.md)**: Quick reference table with task dependencies and development phases
-- **[docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md)**: Detailed explanation of the Hybrid LLM Architecture approach
-- **[docs/TECH_STACK.md](./docs/TECH_STACK.md)**: Tech stack documentation (matches actual build configuration)
+- **[PROJECT_BREAKDOWN.md](./PROJECT_BREAKDOWN.md)**: Detailed module breakdown with task descriptions, priorities, difficulties, and feasibility assessments
+- **[TASK_SUMMARY.md](./TASK_SUMMARY.md)**: Quick reference table with task dependencies and development phases
+- **[LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md)**: Detailed explanation of the Hybrid LLM Architecture approach
+- **[TECH_STACK.md](./TECH_STACK.md)**: Comprehensive tech stack recommendations with alternatives and rationale
 
 ## Project Structure
 
@@ -29,7 +30,7 @@ The project is divided into 5 main modules:
 
 ## Tech Stack
 
-**Recommended Stack** (see [docs/TECH_STACK.md](./docs/TECH_STACK.md) for details):
+**Recommended Stack** (see [TECH_STACK.md](./TECH_STACK.md) for details):
 
 - **Language**: Kotlin
 - **UI**: Jetpack Compose
@@ -38,5 +39,7 @@ The project is divided into 5 main modules:
 - **Networking**: Retrofit + OkHttp
 - **Database**: Room Database
 - **LLM**: Upstage API (Solar LLM) - Partnership support
-- **JSON**: Gson (Retrofit) + kotlinx.serialization (Domain models)
+- **JSON**: kotlinx.serialization
 - **Async**: Kotlin Coroutines
+
+See [TECH_STACK.md](./TECH_STACK.md) for detailed explanations, alternatives, and rationale.
