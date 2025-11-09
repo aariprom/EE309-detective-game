@@ -15,6 +15,7 @@ data class Character(
     val items: List<String> = emptyList(),
     val currentLocation: String = ""
 ) {
+    // NOTE: how about we manage list? hash table? of unlocked places?
     fun isUnlocked(flags: Map<String, Boolean>): Boolean {
         if (unlockConditions.isEmpty()) return true
         return unlockConditions.all { flags[it] == true }
