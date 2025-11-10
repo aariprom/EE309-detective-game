@@ -246,6 +246,8 @@ Apps use a pattern called **MVVM** (Model-View-ViewModel):
 - **`GameScreen.kt`** - The screen users see
 - **`GameUiState.kt`** - Tracks if the screen is loading, showing data, or showing an error
 
+**📖 For a detailed explanation of how the UI works, see [UI_ARCHITECTURE.md](./UI_ARCHITECTURE.md)**
+
 ### Project Directory Structure
 
 ```
@@ -557,9 +559,10 @@ Once you've completed all the steps above, you're ready to start developing!
 ## 📖 Next Steps
 
 1. **Read:** [PROJECT_BREAKDOWN.md](./PROJECT_BREAKDOWN.md) - What the project does
-2. **Read:** [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) - How the AI works
-3. **Read:** [TECH_STACK.md](./TECH_STACK.md) - What technologies we use
-4. **Read:** [TASK_SUMMARY.md](./TASK_SUMMARY.md) - Quick task reference
+2. **Read:** [UI_ARCHITECTURE.md](./UI_ARCHITECTURE.md) - How the UI works (StateFlow, Compose, MVVM)
+3. **Read:** [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) - How the AI works
+4. **Read:** [TECH_STACK.md](./TECH_STACK.md) - What technologies we use
+5. **Read:** [TASK_SUMMARY.md](./TASK_SUMMARY.md) - Quick task reference
 
 ---
 
