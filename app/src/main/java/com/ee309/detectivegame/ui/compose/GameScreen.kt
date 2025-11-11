@@ -26,13 +26,13 @@ fun GameScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val gameState by viewModel.gameState.collectAsState()
+    val conversationHistory by viewModel.conversationHistory.collectAsState()
     
     // Local state for dialogs and conversation
     var showCharacterDialog by remember { mutableStateOf(false) }
     var showPlaceDialog by remember { mutableStateOf(false) }
     var dialogActionType by remember { mutableStateOf<DialogActionType?>(null) }
     var conversationCharacterId by remember { mutableStateOf<String?>(null) }
-    var textHistory by remember { mutableStateOf<List<String>>(emptyList()) }
     
     // Show StartScreen if game hasn't started (gameState is null)
     when {
@@ -51,7 +51,6 @@ fun GameScreen(
                         phase = currentGameState.phase,
                         onRestart = {
                             viewModel.startNewGame("")
-                            textHistory = emptyList()
                             conversationCharacterId = null
                         }
                     )
@@ -64,16 +63,11 @@ fun GameScreen(
                         if (character != null) {
                             ConversationScreen(
                                 character = character,
-                                messages = textHistory.mapIndexed { index, text ->
-                                    ConversationMessage(
-                                        text = text,
-                                        isFromPlayer = index % 2 == 0
-                                    )
-                                },
+                                messages = conversationHistory[charId] ?: emptyList(),
                                 onBack = { conversationCharacterId = null },
                                 onSendMessage = { message ->
-                                    // TODO: Integrate with LLM 2 for dialogue generation
-                                    textHistory = textHistory + message + "[Character response placeholder]"
+                                    viewModel.addConversationMessage(charId, ConversationMessage(message, true))
+                                    viewModel.addConversationMessage(charId, ConversationMessage("[Character response placeholder]", false))
                                 }
                             )
                             return
@@ -84,11 +78,14 @@ fun GameScreen(
                     MainGameScreenContent(
                         gameState = currentGameState,
                         viewModel = viewModel,
-                        textHistory = textHistory,
-                        onTextHistoryChange = { textHistory = it },
                         onInvestigateClick = {
-                            dialogActionType = DialogActionType.Investigate
-                            showPlaceDialog = true
+                            val currentLocation = currentGameState.player.currentLocation
+                            if (currentLocation.isNotEmpty()) {
+                                val place = currentGameState.getPlace(currentLocation)
+                                if (place != null && place.isUnlocked(currentGameState.flags)) {
+                                    viewModel.executeAction(GameAction.Investigate(currentLocation))
+                                }
+                            }
                         },
                         onQuestionClick = {
                             dialogActionType = DialogActionType.Question
@@ -127,12 +124,14 @@ fun GameScreen(
                                 when (dialogActionType) {
                                     DialogActionType.Question -> {
                                         conversationCharacterId = character.id
-                                        textHistory = listOf("You start questioning ${character.name}...")
+                                        val existingHistory = viewModel.getConversationHistory(character.id)
+                                        if (existingHistory.isEmpty()) {
+                                            viewModel.addConversationMessage(character.id, ConversationMessage("You start questioning ${character.name}...", false))
+                                        }
                                         viewModel.executeAction(GameAction.Question(character.id))
                                     }
                                     DialogActionType.Accuse -> {
                                         viewModel.executeAction(GameAction.Accuse(character.id))
-                                        textHistory = textHistory + "You accuse ${character.name}!"
                                     }
                                     else -> {}
                                 }
@@ -162,13 +161,8 @@ fun GameScreen(
                             },
                             onPlaceSelected = { place ->
                                 when (dialogActionType) {
-                                    DialogActionType.Investigate -> {
-                                        viewModel.executeAction(GameAction.Investigate(place.id))
-                                        textHistory = textHistory + "You investigate ${place.name}..."
-                                    }
                                     DialogActionType.Move -> {
                                         viewModel.executeAction(GameAction.Move(place.id))
-                                        textHistory = textHistory + "You move to ${place.name}."
                                     }
                                     else -> {}
                                 }
@@ -176,7 +170,6 @@ fun GameScreen(
                                 dialogActionType = null
                             },
                             title = when (dialogActionType) {
-                                DialogActionType.Investigate -> "Select Place to Investigate"
                                 DialogActionType.Move -> "Select Place to Move To"
                                 else -> "Select Place"
                             },
@@ -240,8 +233,6 @@ private enum class DialogActionType {
 private fun MainGameScreenContent(
     gameState: com.ee309.detectivegame.domain.model.GameState,
     viewModel: GameViewModel,
-    textHistory: List<String>,
-    onTextHistoryChange: (List<String>) -> Unit,
     onInvestigateClick: () -> Unit,
     onQuestionClick: () -> Unit,
     onMoveClick: () -> Unit,
@@ -277,9 +268,9 @@ private fun MainGameScreenContent(
             )
         }
         
-        // Text display area
+        // Text display area (showing general game log - can be enhanced later)
         TextDisplay(
-            messages = textHistory,
+            messages = emptyList(), // TODO: Add general game log messages (investigations, movements, etc.)
             modifier = Modifier.weight(1f)
         )
         
@@ -298,7 +289,8 @@ private fun MainGameScreenContent(
             onMoveClick = onMoveClick,
             onAccuseClick = onAccuseClick,
             modifier = Modifier.fillMaxWidth(),
-            isInvestigateEnabled = gameState.getUnlockedPlaces().isNotEmpty(),
+            isInvestigateEnabled = gameState.player.currentLocation.isNotEmpty() && 
+                gameState.getPlace(gameState.player.currentLocation)?.isUnlocked(gameState.flags) == true,
             isQuestionEnabled = gameState.getCharactersAtLocation(gameState.player.currentLocation).isNotEmpty(),
             isMoveEnabled = gameState.getUnlockedPlaces().size > 1,
             isAccuseEnabled = gameState.getUnlockedCharacters().isNotEmpty()

@@ -120,7 +120,7 @@ fun ConversationScreen(
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Type your question...") },
                 singleLine = true,
-                enabled = false // Disabled for now, will be enabled when LLM integration is ready
+                enabled = true
             )
             Button(
                 onClick = {
@@ -129,7 +129,7 @@ fun ConversationScreen(
                         inputText = ""
                     }
                 },
-                enabled = false // Disabled for now
+                enabled = inputText.isNotBlank()
             ) {
                 Text("Send")
             }

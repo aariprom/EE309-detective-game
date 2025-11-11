@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
+import com.ee309.detectivegame.ui.compose.ConversationMessage
 
 class GameViewModel : ViewModel() {
     
@@ -20,6 +21,9 @@ class GameViewModel : ViewModel() {
     
     private val _gameState = MutableStateFlow<GameState?>(null)
     val gameState: StateFlow<GameState?> = _gameState.asStateFlow()
+    
+    private val _conversationHistory = MutableStateFlow<Map<String, List<ConversationMessage>>>(emptyMap())
+    val conversationHistory: StateFlow<Map<String, List<ConversationMessage>>> = _conversationHistory.asStateFlow()
     
     init {
         // GameUIState Error with empty message indicates initial state
@@ -30,6 +34,7 @@ class GameViewModel : ViewModel() {
     fun startNewGame(keywords: String) {
         viewModelScope.launch {
             _uiState.value = GameUiState.Loading
+            _conversationHistory.value = emptyMap() // Clear conversation history
             try {
                 // TODO: Call LLM 1 to generate initial game content
                 // For now, we use mocking game data for testing
@@ -220,6 +225,16 @@ class GameViewModel : ViewModel() {
         }
 
         return newState
+    }
+    
+    fun addConversationMessage(characterId: String, message: ConversationMessage) {
+        val currentHistory = _conversationHistory.value
+        val characterHistory = currentHistory[characterId] ?: emptyList()
+        _conversationHistory.value = currentHistory + (characterId to (characterHistory + message))
+    }
+    
+    fun getConversationHistory(characterId: String): List<ConversationMessage> {
+        return _conversationHistory.value[characterId] ?: emptyList()
     }
 }
 
