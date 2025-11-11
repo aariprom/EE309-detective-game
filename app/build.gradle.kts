@@ -4,6 +4,12 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+    // 커버리지는 내장 옵션 대신 순정 jacoco 사용
+    id("jacoco")
+}
+
+jacoco {
+    toolVersion = "0.8.12"
 }
 
 android {
@@ -18,9 +24,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
+        vectorDrawables { useSupportLibrary = true }
     }
 
     buildTypes {
@@ -31,20 +35,21 @@ android {
                 "proguard-rules.pro"
             )
         }
+        debug {
+            // 🔴 문제였던 내장 유닛 테스트 커버리지는 비활성화
+            // enableUnitTestCoverage = true
+        }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-    buildFeatures {
-        compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
+    kotlinOptions { jvmTarget = "17" }
+
+    buildFeatures { compose = true }
+    composeOptions { kotlinCompilerExtensionVersion = "1.5.8" }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -64,7 +69,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    
+
     // Compose Navigation
     implementation("androidx.navigation:navigation-compose:2.7.5")
 
@@ -104,3 +109,63 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+   Jacoco 설정 (유닛 테스트용)
+   - 테스트 task에 에이전트 확실히 부착
+   - exec 파일을 표준/대체 경로 패턴으로 안전하게 수집
+   - Provider/Lazy 방식으로 의존만 선언(조기 접근 방지)
+   ──────────────────────────────────────────────────────────────────────────── */
+
+tasks.withType<Test>().configureEach {
+    // 테스트 완료 후 자동으로 리포트 생성
+    finalizedBy("jacocoDebugUnitTestReport")
+
+    // 일부 환경에서 커버리지 수집 누락 방지
+    extensions.configure(org.gradle.testing.jacoco.plugins.JacocoTaskExtension::class) {
+        isIncludeNoLocationClasses = true
+        excludes = listOf("jdk.internal.*")
+    }
+}
+
+tasks.register<org.gradle.testing.jacoco.tasks.JacocoReport>("jacocoDebugUnitTestReport") {
+    dependsOn("testDebugUnitTest")
+
+    // 실행 데이터(.exec) 수집: 표준 + 예외 경로들
+    val execFiles = fileTree(layout.buildDirectory.asFile.get()) {
+        include(
+            "jacoco/testDebugUnitTest.exec",          // 표준
+            "jacoco/test.exec",                       // 경우에 따라 생성될 수 있음
+            "outputs/unit_test_code_coverage/**.exec",
+            "**/jacoco-ut/*.exec"
+        )
+    }
+    executionData(execFiles)
+
+    // 클래스/소스 디렉토리
+    val kotlinClasses = fileTree("$buildDir/tmp/kotlin-classes/debug")
+    val javaClasses = fileTree("$buildDir/intermediates/javac/debug/classes")
+
+    val excludes = listOf(
+        "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*",
+        "androidx/**", "**/*Test*.*", "**/*\$*Companion*.*", "**/*\$WhenMappings*.*",
+        // Hilt/DI 생성물
+        "**/*_Factory.*", "**/*_Hilt*.*", "**/*_MembersInjector.*",
+        "**/*_Provide*Factory.*", "**/*Hilt*.*"
+    )
+
+    classDirectories.setFrom(
+        files(
+            kotlinClasses.apply { exclude(excludes) },
+            javaClasses.apply { exclude(excludes) }
+        )
+    )
+    sourceDirectories.setFrom(files("src/main/java", "src/main/kotlin"))
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/jacocoDebugUnitTestReport/html"))
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/jacocoDebugUnitTestReport/report.xml"))
+    }
+}

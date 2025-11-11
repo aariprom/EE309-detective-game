@@ -1,5 +1,6 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import org.junit.Assert.*
 
@@ -14,6 +15,7 @@ class GameStateTest {
         )
     }
     
+    @OptIn(InternalSerializationApi::class)
     private fun createTestPlace(id: String, name: String, connectedPlaces: List<String> = emptyList(), availableClues: List<String> = emptyList()): Place {
         return Place(
             id = id,
@@ -23,6 +25,7 @@ class GameStateTest {
         )
     }
     
+    @OptIn(InternalSerializationApi::class)
     private fun createTestClue(id: String, content: String): Clue {
         return Clue(
             id = id,
@@ -32,6 +35,7 @@ class GameStateTest {
     
     // ========== Query Methods Tests ==========
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getCharacter returns character when found`() {
         val character = createTestCharacter("char1", "John")
@@ -44,6 +48,7 @@ class GameStateTest {
         assertEquals("char1", result?.id)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getCharacter returns null when not found`() {
         val gameState = GameState()
@@ -53,6 +58,7 @@ class GameStateTest {
         assertNull(result)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getPlace returns place when found`() {
         val place = createTestPlace("place1", "Library")
@@ -64,6 +70,7 @@ class GameStateTest {
         assertEquals("Library", result?.name)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getPlace returns null when not found`() {
         val gameState = GameState()
@@ -73,6 +80,7 @@ class GameStateTest {
         assertNull(result)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getClue returns clue when found`() {
         val clue = createTestClue("clue1", "Fingerprints on the door")
@@ -84,6 +92,7 @@ class GameStateTest {
         assertEquals("Fingerprints on the door", result?.content)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getClue returns null when not found`() {
         val gameState = GameState()
@@ -93,6 +102,7 @@ class GameStateTest {
         assertNull(result)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getCharactersAtLocation returns characters at location`() {
         val char1 = createTestCharacter("char1", "John", "place1")
@@ -107,6 +117,7 @@ class GameStateTest {
         assertTrue(result.any { it.id == "char2" })
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getCharactersAtLocation returns empty list when no characters at location`() {
         val char1 = createTestCharacter("char1", "John", "place1")
@@ -117,6 +128,7 @@ class GameStateTest {
         assertTrue(result.isEmpty())
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getAvailableCluesAtLocation returns unlocked clues at place`() {
         val clue1 = createTestClue("clue1", "Clue 1")
@@ -134,6 +146,7 @@ class GameStateTest {
         assertEquals(3, result.size)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getAvailableCluesAtLocation filters locked clues`() {
         val clue1 = createTestClue("clue1", "Clue 1")
@@ -157,6 +170,7 @@ class GameStateTest {
         assertTrue(result.all { it.id != "clue3" })
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getAvailableCluesAtLocation returns empty when place not found`() {
         val gameState = GameState()
@@ -168,6 +182,7 @@ class GameStateTest {
     
     // ========== Update Methods Tests ==========
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updateFlag adds new flag`() {
         val gameState = GameState()
@@ -178,6 +193,7 @@ class GameStateTest {
         assertTrue(updated.flags.containsKey("flag1"))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updateFlag overwrites existing flag`() {
         val gameState = GameState(flags = mapOf("flag1" to false))
@@ -188,6 +204,7 @@ class GameStateTest {
         assertEquals(1, updated.flags.size)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updateFlag maintains immutability`() {
         val gameState = GameState()
@@ -199,6 +216,7 @@ class GameStateTest {
         assertTrue(updated.flags.containsKey("flag1"))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updateTime updates time correctly`() {
         val gameState = GameState(currentTime = GameTime(30))
@@ -210,6 +228,7 @@ class GameStateTest {
         assertEquals(30, gameState.currentTime.minutes) // Original unchanged
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updatePlayer updates player correctly`() {
         val oldPlayer = Player(name = "Old Name", currentLocation = "place1")
@@ -223,6 +242,7 @@ class GameStateTest {
         assertEquals("Old Name", gameState.player.name) // Original unchanged
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updatePhase updates phase correctly`() {
         val gameState = GameState(phase = GamePhase.START)
@@ -233,6 +253,7 @@ class GameStateTest {
         assertEquals(GamePhase.START, gameState.phase) // Original unchanged
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `addCharacter adds character to state`() {
         val gameState = GameState()
@@ -245,6 +266,7 @@ class GameStateTest {
         assertTrue(gameState.characters.isEmpty()) // Original unchanged
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updateCharacter updates existing character`() {
         val character = createTestCharacter("char1", "John", "place1")
@@ -258,6 +280,7 @@ class GameStateTest {
         assertEquals("John", gameState.characters.first().name) // Original unchanged
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updateCharacter returns unchanged state when character not found`() {
         val character = createTestCharacter("char1", "John")
@@ -271,6 +294,7 @@ class GameStateTest {
         assertEquals("John", updated.characters.first().name)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `removeCharacter removes character from state`() {
         val char1 = createTestCharacter("char1", "John")
@@ -284,6 +308,7 @@ class GameStateTest {
         assertEquals(2, gameState.characters.size) // Original unchanged
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `addPlace adds place to state`() {
         val gameState = GameState()
@@ -295,6 +320,7 @@ class GameStateTest {
         assertEquals("Library", updated.places.first().name)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updatePlace updates existing place`() {
         val place = createTestPlace("place1", "Library")
@@ -306,6 +332,7 @@ class GameStateTest {
         assertEquals("Grand Library", updated.places.first().name)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `removePlace removes place from state`() {
         val place1 = createTestPlace("place1", "Library")
@@ -318,6 +345,7 @@ class GameStateTest {
         assertEquals("place2", updated.places.first().id)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `addClue adds clue to state`() {
         val gameState = GameState()
@@ -329,6 +357,7 @@ class GameStateTest {
         assertEquals("Fingerprints", updated.clues.first().content)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `updateClue updates existing clue`() {
         val clue = createTestClue("clue1", "Old content")
@@ -340,6 +369,7 @@ class GameStateTest {
         assertEquals("New content", updated.clues.first().content)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `removeClue removes clue from state`() {
         val clue1 = createTestClue("clue1", "Clue 1")
@@ -354,6 +384,7 @@ class GameStateTest {
     
     // ========== Time Management Tests ==========
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `advanceTime advances time correctly`() {
         val gameState = GameState(currentTime = GameTime(30))
@@ -364,6 +395,7 @@ class GameStateTest {
         assertEquals(30, gameState.currentTime.minutes) // Original unchanged
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `advanceTime caps at timeline endTime`() {
         val timeline = Timeline(GameTime(0), GameTime(60))
@@ -374,6 +406,7 @@ class GameStateTest {
         assertEquals(60, updated.currentTime.minutes)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getRemainingTime calculates correctly`() {
         val timeline = Timeline(GameTime(0), GameTime(480))
@@ -384,6 +417,7 @@ class GameStateTest {
         assertEquals(360, remaining.minutes)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getRemainingTime returns zero when time limit exceeded`() {
         val timeline = Timeline(GameTime(0), GameTime(480))
@@ -394,6 +428,7 @@ class GameStateTest {
         assertEquals(0, remaining.minutes)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getTimeProgress calculates correctly`() {
         val timeline = Timeline(GameTime(0), GameTime(480))
@@ -404,6 +439,7 @@ class GameStateTest {
         assertEquals(0.5, progress, 0.01) // 50% elapsed
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getTimeProgress returns 1_0 when time limit exceeded`() {
         val timeline = Timeline(GameTime(0), GameTime(480))
@@ -414,6 +450,7 @@ class GameStateTest {
         assertEquals(1.0, progress, 0.01)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `isTimeLimitExceeded returns true when exceeded`() {
         val timeline = Timeline(GameTime(0), GameTime(480))
@@ -422,6 +459,7 @@ class GameStateTest {
         assertTrue(gameState.isTimeLimitExceeded())
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `isTimeLimitExceeded returns false when not exceeded`() {
         val timeline = Timeline(GameTime(0), GameTime(480))
@@ -430,6 +468,7 @@ class GameStateTest {
         assertFalse(gameState.isTimeLimitExceeded())
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `advanceTimeWithEvents detects triggered events`() {
         val event = TimelineEvent(
@@ -450,6 +489,7 @@ class GameStateTest {
         assertEquals("event1", result.triggeredEvents.first().id)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getTriggeredEventsBetween finds events in time range`() {
         val event1 = TimelineEvent(
@@ -480,6 +520,7 @@ class GameStateTest {
         assertTrue(events.any { it.id == "event2" })
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `performActionWithTime advances time with action cost`() {
         val gameState = GameState(currentTime = GameTime(30))
@@ -490,6 +531,7 @@ class GameStateTest {
         assertEquals(45, result.newState.currentTime.minutes)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `performMovementWithTime calculates distance-based time`() {
         val place1 = createTestPlace("place1", "Library", connectedPlaces = listOf("place2"))
@@ -508,6 +550,7 @@ class GameStateTest {
     
     // ========== Event Processing Tests ==========
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `processTimelineEvents processes character movement event`() {
         val character = createTestCharacter("char1", "John", "place1")
@@ -528,6 +571,7 @@ class GameStateTest {
         assertEquals("place2", updatedChar?.currentLocation)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `processTimelineEvents processes evidence destruction event`() {
         val clue1 = createTestClue("clue1", "Clue 1")
@@ -549,6 +593,7 @@ class GameStateTest {
         assertTrue(updated.flags.containsKey("evidence_destroyed_event1"))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `processTimelineEvents processes multiple events`() {
         val character = createTestCharacter("char1", "John", "place1")
@@ -580,6 +625,7 @@ class GameStateTest {
         assertNull(updated.getClue("clue1"))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `advanceTimeAndProcessEvents combines time advancement and event processing`() {
         val character = createTestCharacter("char1", "John", "place1")
@@ -606,6 +652,7 @@ class GameStateTest {
     
     // ========== Game Logic Helper Tests ==========
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getUnlockedCharacters returns only unlocked characters`() {
         val char1 = createTestCharacter("char1", "John")
@@ -624,6 +671,7 @@ class GameStateTest {
         assertEquals(2, unlocked.size) // Both unlocked
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getUnlockedCharacters filters locked characters`() {
         val char1 = createTestCharacter("char1", "John")
@@ -643,6 +691,7 @@ class GameStateTest {
         assertEquals("char1", unlocked.first().id)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getAvailableCharacters filters hidden characters`() {
         val char1 = createTestCharacter("char1", "John")
@@ -662,6 +711,7 @@ class GameStateTest {
         assertEquals("char1", available.first().id)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getCurrentLocation returns player location`() {
         val place = createTestPlace("place1", "Library")
@@ -677,6 +727,7 @@ class GameStateTest {
         assertEquals("Library", location?.name)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getCurrentLocation returns null when player has no location`() {
         val gameState = GameState(player = Player(currentLocation = ""))
@@ -686,6 +737,7 @@ class GameStateTest {
         assertNull(location)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getCharactersAtCurrentLocation returns characters at player location`() {
         val place = createTestPlace("place1", "Library")
@@ -704,6 +756,7 @@ class GameStateTest {
         assertEquals("char1", characters.first().id)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getNearbyPlaces returns connected places`() {
         val place1 = createTestPlace("place1", "Library", connectedPlaces = listOf("place2", "place3"))
@@ -722,6 +775,7 @@ class GameStateTest {
         assertTrue(nearby.any { it.id == "place3" })
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `canProgressToPhase allows valid phase transitions`() {
         val gameState = GameState(phase = GamePhase.START)
@@ -730,6 +784,7 @@ class GameStateTest {
         assertFalse(gameState.canProgressToPhase(GamePhase.INVESTIGATION))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `canProgressToPhase prevents invalid phase transitions`() {
         val gameState = GameState(phase = GamePhase.START)
@@ -738,6 +793,7 @@ class GameStateTest {
         assertFalse(gameState.canProgressToPhase(GamePhase.GAME_OVER))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `canProgressToPhase prevents progression from end states`() {
         val gameState = GameState(phase = GamePhase.WIN)
@@ -746,6 +802,7 @@ class GameStateTest {
         assertFalse(gameState.canProgressToPhase(GamePhase.START))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `checkWinConditions returns LOSE when time limit exceeded`() {
         val timeline = Timeline(GameTime(0), GameTime(480))
@@ -757,6 +814,7 @@ class GameStateTest {
         assertEquals(GameState.GameResult.LOSE, result)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `checkWinConditions returns null when game in progress`() {
         val timeline = Timeline(GameTime(0), GameTime(480))
