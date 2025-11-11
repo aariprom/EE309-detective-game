@@ -1,5 +1,7 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.InternalSerializationApi
+
 /**
  * Defines time costs for different game actions.
  * All time costs are in minutes (5-minute minimum unit).
@@ -105,6 +107,7 @@ object ActionTimeCosts {
      * @param to The destination place.
      * @return The total time cost in minutes for the movement.
      */
+    @OptIn(InternalSerializationApi::class)
     fun getMovementTime(from: Place, to: Place): Int {
         val distance = from.getDistanceTo(to)
         return getMovementTime(distance)

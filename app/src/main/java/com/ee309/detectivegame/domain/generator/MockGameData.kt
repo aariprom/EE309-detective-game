@@ -1,6 +1,7 @@
 package com.ee309.detectivegame.domain.generator
 
 import com.ee309.detectivegame.domain.model.*
+import kotlinx.serialization.InternalSerializationApi
 
 /**
  * Mock game data generator for testing and development.
@@ -22,6 +23,7 @@ object MockGameData {
      * 
      * @return Complete GameState ready for gameplay
      */
+    @OptIn(InternalSerializationApi::class)
     fun createInitialGameState(): GameState {
         // Create characters
         val characters = createMockCharacters()
@@ -125,6 +127,7 @@ object MockGameData {
     /**
      * Creates mock places for the game.
      */
+    @OptIn(InternalSerializationApi::class)
     private fun createMockPlaces(): List<Place> {
         return listOf(
             // Place 1: Crime Scene
@@ -171,6 +174,7 @@ object MockGameData {
     /**
      * Creates mock clues for the game.
      */
+    @OptIn(InternalSerializationApi::class)
     private fun createMockClues(): List<Clue> {
         return listOf(
             // Clue 1: Bloodstain at crime scene

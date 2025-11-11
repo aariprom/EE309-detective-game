@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.InternalSerializationApi
+import com.ee309.detectivegame.ui.compose.ConversationMessage
 
 class GameViewModel : ViewModel() {
     
@@ -20,14 +22,19 @@ class GameViewModel : ViewModel() {
     private val _gameState = MutableStateFlow<GameState?>(null)
     val gameState: StateFlow<GameState?> = _gameState.asStateFlow()
     
+    private val _conversationHistory = MutableStateFlow<Map<String, List<ConversationMessage>>>(emptyMap())
+    val conversationHistory: StateFlow<Map<String, List<ConversationMessage>>> = _conversationHistory.asStateFlow()
+    
     init {
-        // TODO: Initialize game state
-        _uiState.value = GameUiState.Loading
+        // GameUIState Error with empty message indicates initial state
+        // TODO: Make a distinct UI state for very first initialization
+        _uiState.value = GameUiState.Error("")
     }
     
     fun startNewGame(keywords: String) {
         viewModelScope.launch {
             _uiState.value = GameUiState.Loading
+            _conversationHistory.value = emptyMap() // Clear conversation history
             try {
                 // TODO: Call LLM 1 to generate initial game content
                 // For now, we use mocking game data for testing
@@ -70,6 +77,7 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    @OptIn(InternalSerializationApi::class)
     fun transitionToPhase(phase: GamePhase) {
         try {
             val currentState = _gameState.value?: throw Exception("Game state is null")
@@ -103,6 +111,7 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun isActionValid(action: GameAction, state: GameState): Boolean {
         return when (action) {
             is GameAction.Investigate -> {
@@ -132,6 +141,7 @@ class GameViewModel : ViewModel() {
         _uiState.value = GameUiState.Success(newState)
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun handleInvestigation(placeId: String, state: GameState): GameState {
         val place = state.getPlace(placeId) ?: return state
 
@@ -144,6 +154,7 @@ class GameViewModel : ViewModel() {
         return state.copy(currentTime = newTime)
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun handleQuestioning(characterId: String, question: String?, state: GameState): GameState {
         val character = state.getCharacter(characterId) ?: return state
 
@@ -161,6 +172,7 @@ class GameViewModel : ViewModel() {
         return state.copy(currentTime = newTime)
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun handleMovement(placeId: String, state: GameState): GameState {
         val place = state.getPlace(placeId) ?: return state
         val currentPlace = state.getPlace(state.player.currentLocation) ?: return state
@@ -187,6 +199,7 @@ class GameViewModel : ViewModel() {
         )
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun handleAccusation(characterId: String, evidence: List<String>, state: GameState): GameState {
         val character = state.getCharacter(characterId) ?: return state
 
@@ -212,6 +225,16 @@ class GameViewModel : ViewModel() {
         }
 
         return newState
+    }
+    
+    fun addConversationMessage(characterId: String, message: ConversationMessage) {
+        val currentHistory = _conversationHistory.value
+        val characterHistory = currentHistory[characterId] ?: emptyList()
+        _conversationHistory.value = currentHistory + (characterId to (characterHistory + message))
+    }
+    
+    fun getConversationHistory(characterId: String): List<ConversationMessage> {
+        return _conversationHistory.value[characterId] ?: emptyList()
     }
 }
 
