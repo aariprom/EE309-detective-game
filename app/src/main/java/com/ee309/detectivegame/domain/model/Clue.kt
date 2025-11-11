@@ -1,13 +1,17 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
  * Represents a clue in the game
  */
+@InternalSerializationApi
 @Serializable
 data class Clue(
     val id: String,
+    val name: String = "Default Clue Name",
+    val description: String = "Default Clue Description",
     val who: String? = null, // Who is involved
     val whom: String? = null, // Who is affected
     val time: GameTime? = null, // When it happened

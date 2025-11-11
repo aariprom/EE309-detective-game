@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.InternalSerializationApi
 
 class GameViewModel : ViewModel() {
     
@@ -21,8 +22,9 @@ class GameViewModel : ViewModel() {
     val gameState: StateFlow<GameState?> = _gameState.asStateFlow()
     
     init {
-        // TODO: Initialize game state
-        _uiState.value = GameUiState.Loading
+        // GameUIState Error with empty message indicates initial state
+        // TODO: Make a distinct UI state for very first initialization
+        _uiState.value = GameUiState.Error("")
     }
     
     fun startNewGame(keywords: String) {
@@ -70,6 +72,7 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    @OptIn(InternalSerializationApi::class)
     fun transitionToPhase(phase: GamePhase) {
         try {
             val currentState = _gameState.value?: throw Exception("Game state is null")
@@ -103,6 +106,7 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun isActionValid(action: GameAction, state: GameState): Boolean {
         return when (action) {
             is GameAction.Investigate -> {
@@ -132,6 +136,7 @@ class GameViewModel : ViewModel() {
         _uiState.value = GameUiState.Success(newState)
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun handleInvestigation(placeId: String, state: GameState): GameState {
         val place = state.getPlace(placeId) ?: return state
 
@@ -144,6 +149,7 @@ class GameViewModel : ViewModel() {
         return state.copy(currentTime = newTime)
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun handleQuestioning(characterId: String, question: String?, state: GameState): GameState {
         val character = state.getCharacter(characterId) ?: return state
 
@@ -161,6 +167,7 @@ class GameViewModel : ViewModel() {
         return state.copy(currentTime = newTime)
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun handleMovement(placeId: String, state: GameState): GameState {
         val place = state.getPlace(placeId) ?: return state
         val currentPlace = state.getPlace(state.player.currentLocation) ?: return state
@@ -187,6 +194,7 @@ class GameViewModel : ViewModel() {
         )
     }
 
+    @OptIn(InternalSerializationApi::class)
     private fun handleAccusation(characterId: String, evidence: List<String>, state: GameState): GameState {
         val character = state.getCharacter(characterId) ?: return state
 
