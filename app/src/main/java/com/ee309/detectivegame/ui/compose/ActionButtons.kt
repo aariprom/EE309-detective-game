@@ -2,6 +2,7 @@ package com.ee309.detectivegame.ui.compose
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -44,7 +45,7 @@ fun ActionButtons(
             
             ActionButton(
                 text = "Question",
-                icon = Icons.Default.Info,
+                icon = Icons.Default.QuestionAnswer,
                 onClick = onQuestionClick,
                 enabled = isQuestionEnabled,
                 modifier = Modifier.weight(1f)
@@ -58,7 +59,7 @@ fun ActionButtons(
         ) {
             ActionButton(
                 text = "Move",
-                icon = Icons.Default.ArrowForward,
+                icon = Icons.AutoMirrored.Filled.DirectionsRun,
                 onClick = onMoveClick,
                 enabled = isMoveEnabled,
                 modifier = Modifier.weight(1f)
@@ -66,7 +67,7 @@ fun ActionButtons(
             
             ActionButton(
                 text = "Accuse",
-                icon = Icons.Default.Warning,
+                icon = Icons.Default.Gavel,
                 onClick = onAccuseClick,
                 enabled = isAccuseEnabled,
                 modifier = Modifier.weight(1f)
@@ -107,4 +108,3 @@ private fun ActionButton(
         }
     }
 }
-
