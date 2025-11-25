@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -8,6 +10,14 @@ plugins {
     id("jacoco")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// Load local.properties
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+
 
 jacoco {
     toolVersion = "0.8.12"
@@ -34,6 +44,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+        
+        buildConfigField("String", "UPSTAGE_API_KEY", localProperties.getProperty("UPSTAGE_API_KEY", ""))
+        buildConfigField("String", "UPSTAGE_BASE_URL", localProperties.getProperty("UPSTAGE_BASE_URL", "https://api.upstage.ai/"))
     }
 
     buildTypes {
@@ -55,7 +68,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    buildFeatures { compose = true }
+    buildFeatures { 
+        compose = true 
+        buildConfig = true
+    }
     
     // marked unstable to use with @Incubating, suppress for now
     @Suppress("UnstableApiUsage")
