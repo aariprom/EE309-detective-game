@@ -6,6 +6,8 @@ on:
       - main      # Production releases
       - dev       # Development releases
 
+permissions: write-all
+
 jobs:
   build:
     runs-on: ubuntu-latest
