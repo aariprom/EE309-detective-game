@@ -6,10 +6,19 @@ plugins {
     id("com.google.devtools.ksp")
     // 커버리지는 내장 옵션 대신 순정 jacoco 사용
     id("jacoco")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 jacoco {
     toolVersion = "0.8.12"
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(
+            org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        )
+    }
 }
 
 android {
@@ -45,7 +54,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
 
     buildFeatures { compose = true }
     
@@ -72,6 +80,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
     // Compose Navigation
     implementation("androidx.navigation:navigation-compose:2.9.6")
@@ -142,7 +151,7 @@ tasks.register<JacocoReport>("jacocoDebugUnitTestReport") {
             "**/jacoco-ut/*.exec"
         )
     }
-    executionData(execFiles)
+    executionData( execFiles)
 
     // 클래스/소스 디렉토리
     val kotlinClasses = fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug"))
@@ -150,7 +159,7 @@ tasks.register<JacocoReport>("jacocoDebugUnitTestReport") {
 
     val excludes = listOf(
         "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*",
-        "androidx/**", "**/*Test*.*", "**/*$*Companion*.*", "**/*\$WhenMappings*.*",
+        "androidx/**", "**/*Test*.*", "**/*$*Companion*.*", "**/*$*WhenMappings*.*",
         // Hilt/DI 생성물
         "**/*_Factory.*", "**/*_Hilt*.*", "**/*_MembersInjector.*",
         "**/*_Provide*Factory.*", "**/*Hilt*.*"
