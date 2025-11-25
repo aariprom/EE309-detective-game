@@ -1,5 +1,4 @@
 package com.ee309.detectivegame.ui.compose
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -12,7 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.ee309.detectivegame.domain.model.GameAction
 import com.ee309.detectivegame.domain.model.GamePhase
 import com.ee309.detectivegame.presentation.state.GameUiState

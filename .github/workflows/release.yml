@@ -1,0 +1,124 @@
+name: Release Build
+
+on:
+  push:
+    branches:
+      - main      # Production releases
+      - dev       # Development releases
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        cache: 'gradle'
+        
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+      
+    - name: Decode keystore
+      id: keystore
+      run: |
+        if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          chmod 600 keystore.jks
+          echo "file=keystore.jks" >> $GITHUB_OUTPUT
+        else
+          echo "file=" >> $GITHUB_OUTPUT
+        fi
+      
+    - name: Determine build type
+      id: build_type
+      run: |
+        if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          echo "type=production" >> $GITHUB_OUTPUT
+          echo "variant=release" >> $GITHUB_OUTPUT
+        else
+          echo "type=development" >> $GITHUB_OUTPUT
+          echo "variant=release" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Build Release APK
+      run: ./gradlew assembleRelease
+      env:
+        KEYSTORE_FILE: ${{ steps.keystore.outputs.file }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      
+    - name: Build Release AAB
+      run: ./gradlew bundleRelease
+      env:
+        KEYSTORE_FILE: ${{ steps.keystore.outputs.file }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      
+    - name: Get version info
+      id: version
+      run: |
+        VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts || echo "1.0")
+        VERSION_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts || echo "1")
+        echo "name=$VERSION_NAME" >> $GITHUB_OUTPUT
+        echo "code=$VERSION_CODE" >> $GITHUB_OUTPUT
+        
+    - name: Create output directory
+      run: mkdir -p release-outputs
+      
+    - name: Copy APK
+      run: |
+        cp app/build/outputs/apk/release/*.apk release-outputs/app-release.apk
+        
+    - name: Copy AAB
+      run: |
+        cp app/build/outputs/bundle/release/*.aab release-outputs/app-release.aab
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.build_type.outputs.type }}-apk
+        path: release-outputs/app-release.apk
+        retention-days: 30
+        
+    - name: Upload AAB artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.build_type.outputs.type }}-aab
+        path: release-outputs/app-release.aab
+        retention-days: 30
+        
+    - name: Create GitHub Release (main branch only)
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release-outputs/app-release.apk
+          release-outputs/app-release.aab
+        tag_name: v${{ steps.version.outputs.name }}-${{ github.run_number }}
+        name: Release v${{ steps.version.outputs.name }}-${{ github.run_number }}
+        body: |
+          Production Release
+          
+          **Version:** ${{ steps.version.outputs.name }} (Code: ${{ steps.version.outputs.code }})
+          **Build Number:** ${{ github.run_number }}
+          **Commit:** ${{ github.sha }}
+          
+          ## Downloads
+          - **APK:** app-release.apk
+          - **AAB:** app-release.aab
+          
+          ## Build Info
+          This build is signed using the configured GitHub Secrets.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

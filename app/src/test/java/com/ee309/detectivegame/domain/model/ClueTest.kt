@@ -1,10 +1,12 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import org.junit.Assert.*
 
 class ClueTest {
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `isUnlocked returns true when no unlock conditions`() {
         val clue = Clue(
@@ -17,6 +19,7 @@ class ClueTest {
         assertTrue(clue.isUnlocked(mapOf("flag1" to false)))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `isUnlocked returns true when all conditions met`() {
         val clue = Clue(
@@ -29,6 +32,7 @@ class ClueTest {
         assertTrue(clue.isUnlocked(flags))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `isUnlocked returns false when any condition not met`() {
         val clue = Clue(
@@ -41,6 +45,7 @@ class ClueTest {
         assertFalse(clue.isUnlocked(flags))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `isUnlocked returns false when flag missing`() {
         val clue = Clue(
@@ -53,6 +58,7 @@ class ClueTest {
         assertFalse(clue.isUnlocked(flags))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `clue can have nullable properties`() {
         val clue = Clue(
@@ -71,6 +77,7 @@ class ClueTest {
         assertEquals("Test clue", clue.content)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `clue can have all properties set`() {
         val clue = Clue(

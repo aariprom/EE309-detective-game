@@ -1,10 +1,12 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import org.junit.Assert.*
 
 class PlaceTest {
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `isUnlocked returns true when no unlock conditions`() {
         val place = Place(
@@ -17,6 +19,7 @@ class PlaceTest {
         assertTrue(place.isUnlocked(mapOf("flag1" to false)))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `isUnlocked returns true when all conditions met`() {
         val place = Place(
@@ -29,6 +32,7 @@ class PlaceTest {
         assertTrue(place.isUnlocked(flags))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `isUnlocked returns false when any condition not met`() {
         val place = Place(
@@ -41,6 +45,7 @@ class PlaceTest {
         assertFalse(place.isUnlocked(flags))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getDistanceTo returns 1 for connected places`() {
         val place1 = Place(
@@ -58,6 +63,7 @@ class PlaceTest {
         assertEquals(1, place2.getDistanceTo(place1))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getDistanceTo returns 2 for non-connected places`() {
         val place1 = Place(
@@ -74,6 +80,7 @@ class PlaceTest {
         assertEquals(2, place1.getDistanceTo(place2))
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getDistanceTo returns 2 when place not in connected list`() {
         val place1 = Place(

@@ -1,5 +1,6 @@
 package com.ee309.detectivegame.domain.model
 
+import kotlinx.serialization.InternalSerializationApi
 import org.junit.Test
 import org.junit.Assert.*
 
@@ -70,6 +71,7 @@ class ActionTimeCostsTest {
         assertEquals(10, rounded) // rounds down to nearest 5
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getMovementTime with Place objects uses getDistanceTo`() {
         val place1 = Place(
@@ -88,6 +90,7 @@ class ActionTimeCostsTest {
         assertEquals(10, time)
     }
     
+    @OptIn(InternalSerializationApi::class)
     @Test
     fun `getMovementTime with Place objects for non-connected places`() {
         val place1 = Place(
@@ -137,12 +140,13 @@ class ActionTimeCostsTest {
     
     @Test
     fun `all time cost constants are multiples of MIN_TIME_UNIT`() {
-        assertTrue(ActionTimeCosts.INVESTIGATION_TIME % ActionTimeCosts.MIN_TIME_UNIT == 0)
-        assertTrue(ActionTimeCosts.QUESTIONING_TIME % ActionTimeCosts.MIN_TIME_UNIT == 0)
-        assertTrue(ActionTimeCosts.MOVEMENT_BASE_TIME % ActionTimeCosts.MIN_TIME_UNIT == 0)
-        assertTrue(ActionTimeCosts.MOVEMENT_DISTANCE_TIME % ActionTimeCosts.MIN_TIME_UNIT == 0)
-        assertTrue(ActionTimeCosts.ACCUSATION_TIME % ActionTimeCosts.MIN_TIME_UNIT == 0)
-        assertTrue(ActionTimeCosts.FREE_ACTION_DEFAULT_TIME % ActionTimeCosts.MIN_TIME_UNIT == 0)
+        // Use isValidTimeUnit function which already checks for multiples of MIN_TIME_UNIT
+        assertTrue(ActionTimeCosts.isValidTimeUnit(ActionTimeCosts.INVESTIGATION_TIME))
+        assertTrue(ActionTimeCosts.isValidTimeUnit(ActionTimeCosts.QUESTIONING_TIME))
+        assertTrue(ActionTimeCosts.isValidTimeUnit(ActionTimeCosts.MOVEMENT_BASE_TIME))
+        assertTrue(ActionTimeCosts.isValidTimeUnit(ActionTimeCosts.MOVEMENT_DISTANCE_TIME))
+        assertTrue(ActionTimeCosts.isValidTimeUnit(ActionTimeCosts.ACCUSATION_TIME))
+        assertTrue(ActionTimeCosts.isValidTimeUnit(ActionTimeCosts.FREE_ACTION_DEFAULT_TIME))
     }
 }
 
