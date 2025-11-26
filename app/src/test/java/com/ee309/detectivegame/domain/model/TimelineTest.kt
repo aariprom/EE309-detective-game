@@ -9,8 +9,10 @@ class TimelineTest {
         return TimelineEvent(
             id = id,
             time = time,
-            eventType = TimelineEvent.EventType.CHARACTER_ACTION,
-            description = "Test event $id"
+            eventType = TimelineEvent.EventType.CHARACTER_MOVEMENT,
+            description = "Test event $id",
+            characterId = "char1",
+            placeId = "place1"
         )
     }
     

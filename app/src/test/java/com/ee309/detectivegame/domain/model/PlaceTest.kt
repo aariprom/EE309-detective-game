@@ -12,7 +12,8 @@ class PlaceTest {
         val place = Place(
             id = "place1",
             name = "Library",
-            unlockConditions = emptyList()
+            unlockConditions = emptyList(),
+            description = "desc"
         )
         
         assertTrue(place.isUnlocked(emptyMap()))
@@ -25,7 +26,8 @@ class PlaceTest {
         val place = Place(
             id = "place1",
             name = "Library",
-            unlockConditions = listOf("flag1", "flag2")
+            unlockConditions = listOf("flag1", "flag2"),
+            description = "desc"
         )
         val flags = mapOf("flag1" to true, "flag2" to true)
         
@@ -38,7 +40,8 @@ class PlaceTest {
         val place = Place(
             id = "place1",
             name = "Library",
-            unlockConditions = listOf("flag1", "flag2")
+            unlockConditions = listOf("flag1", "flag2"),
+            description = "desc"
         )
         val flags = mapOf("flag1" to true, "flag2" to false)
         
@@ -51,12 +54,14 @@ class PlaceTest {
         val place1 = Place(
             id = "place1",
             name = "Library",
-            connectedPlaces = listOf("place2")
+            connectedPlaces = listOf("place2"),
+            description = "desc"
         )
         val place2 = Place(
             id = "place2",
             name = "Garden",
-            connectedPlaces = listOf("place1")
+            connectedPlaces = listOf("place1"),
+            description = "desc"
         )
         
         assertEquals(1, place1.getDistanceTo(place2))
@@ -69,12 +74,14 @@ class PlaceTest {
         val place1 = Place(
             id = "place1",
             name = "Library",
-            connectedPlaces = emptyList()
+            connectedPlaces = emptyList(),
+            description = "desc"
         )
         val place2 = Place(
             id = "place2",
             name = "Garden",
-            connectedPlaces = emptyList()
+            connectedPlaces = emptyList(),
+            description = "desc"
         )
         
         assertEquals(2, place1.getDistanceTo(place2))
@@ -86,12 +93,14 @@ class PlaceTest {
         val place1 = Place(
             id = "place1",
             name = "Library",
-            connectedPlaces = listOf("place3") // place2 not in list
+            connectedPlaces = listOf("place3"), // place2 not in list
+            description = "desc"
         )
         val place2 = Place(
             id = "place2",
             name = "Garden",
-            connectedPlaces = emptyList()
+            connectedPlaces = emptyList(),
+            description = "desc"
         )
         
         assertEquals(2, place1.getDistanceTo(place2))

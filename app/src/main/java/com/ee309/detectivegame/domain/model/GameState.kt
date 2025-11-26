@@ -11,6 +11,8 @@ import kotlinx.serialization.Serializable
 @OptIn(InternalSerializationApi::class)
 @Serializable
 data class GameState(
+    val title: String = "Detective Scenario",
+    val description: String = "A short, descriptive title of the detective case.",
     val phase: GamePhase = GamePhase.START,
     val currentTime: GameTime = GameTime(0),
     val player: Player = Player(),
@@ -514,15 +516,6 @@ data class GameState(
             TimelineEvent.EventType.CHARACTER_MOVEMENT -> {
                 processCharacterMovement(event)
             }
-            TimelineEvent.EventType.CLUE_AVAILABILITY -> {
-                processClueAvailability(event)
-            }
-            TimelineEvent.EventType.EVIDENCE_DESTRUCTION -> {
-                processEvidenceDestruction(event)
-            }
-            TimelineEvent.EventType.CHARACTER_ACTION -> {
-                processCharacterAction(event)
-            }
             TimelineEvent.EventType.PLACE_CHANGE -> {
                 processPlaceChange(event)
             }
@@ -547,53 +540,6 @@ data class GameState(
         val updatedCharacter = character.copy(currentLocation = newLocation)
         
         return updateCharacter(updatedCharacter)
-    }
-    
-    /**
-     * Processes a clue availability event.
-     * Currently sets a flag to indicate clue availability changed.
-     * Full implementation may require adding/removing clues from places.
-     * 
-     * @param event The clue availability event.
-     * @return Updated GameState with clue availability flags updated.
-     */
-    private fun processClueAvailability(event: TimelineEvent): GameState {
-        // Set flag indicating clue availability changed
-        val flagKey = "clue_availability_${event.id}"
-        return updateFlag(flagKey, true)
-    }
-    
-    /**
-     * Processes an evidence destruction event.
-     * Removes clues from the game state if they are specified in affectedComponents.
-     * 
-     * @param event The evidence destruction event.
-     * @return Updated GameState with destroyed clues removed.
-     */
-    private fun processEvidenceDestruction(event: TimelineEvent): GameState {
-        var updatedState = this
-        
-        // Remove clues specified in affectedComponents
-        event.affectedComponents.forEach { clueId ->
-            updatedState = updatedState.removeClue(clueId)
-        }
-        
-        // Set flag indicating evidence was destroyed
-        val flagKey = "evidence_destroyed_${event.id}"
-        return updatedState.updateFlag(flagKey, true)
-    }
-    
-    /**
-     * Processes a character action event.
-     * Sets flags based on the action described in the event.
-     * 
-     * @param event The character action event.
-     * @return Updated GameState with action flags set.
-     */
-    private fun processCharacterAction(event: TimelineEvent): GameState {
-        // Set flag for character action
-        val flagKey = "character_action_${event.characterId}_${event.id}"
-        return updateFlag(flagKey, true)
     }
     
     /**

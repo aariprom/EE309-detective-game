@@ -12,11 +12,14 @@ import kotlinx.serialization.Serializable
 data class Place(
     val id: String,
     val name: String,
-    val traits: List<String> = emptyList(),
+    val description: String,
     val availableClues: List<String> = emptyList(),
     val hidden: Boolean = false,
     val unlockConditions: List<String> = emptyList(),
     val items: List<String> = emptyList(),
+    // todo: This must be initialized when game starts
+    // LLM 1 does not set this; fill this by iterating on characters
+    // refer to character.currentLocation
     val currentCharacters: List<String> = emptyList(),
     val connectedPlaces: List<String> = emptyList()
 ) {
