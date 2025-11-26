@@ -580,7 +580,7 @@ class GameStateTest {
         val event = TimelineEvent(
             id = "event1",
             time = GameTime(30),
-            eventType = TimelineEvent.EventType.EVIDENCE_DESTRUCTION,
+            eventType = TimelineEvent.EventType.CLUE_DESTRUCTION,
             description = "Evidence destroyed",
             affectedComponents = listOf("clue1")
         )
@@ -613,7 +613,7 @@ class GameStateTest {
         val event2 = TimelineEvent(
             id = "event2",
             time = GameTime(45),
-            eventType = TimelineEvent.EventType.EVIDENCE_DESTRUCTION,
+            eventType = TimelineEvent.EventType.CLUE_DESTRUCTION,
             description = "Evidence destroyed",
             affectedComponents = listOf("clue1")
         )

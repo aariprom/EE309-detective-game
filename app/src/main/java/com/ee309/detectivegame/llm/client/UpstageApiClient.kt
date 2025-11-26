@@ -9,6 +9,7 @@ import retrofit2.http.POST
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import java.util.concurrent.TimeUnit
+import com.google.gson.JsonObject
 
 /**
  * Upstage API client interface
@@ -23,8 +24,10 @@ data class ChatRequest(
     val messages: List<ChatMessage>,
     val temperature: Double = 0.7,
     @SerializedName("max_tokens")
-    val maxTokens: Int = 1000,
-    val stream: Boolean = false
+    val maxTokens: Int,
+    val stream: Boolean = false,
+    @SerializedName("response_format")
+    val responseFormat: JsonObject?
 )
 
 data class ChatMessage(
