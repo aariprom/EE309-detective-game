@@ -18,6 +18,8 @@ if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
 
+fun loadEnv(name: String): String? =
+    localProperties.getProperty(name) ?: System.getenv(name)
 
 jacoco {
     toolVersion = "0.8.12"
@@ -46,9 +48,12 @@ android {
         // override above by hilt test runner
         testInstrumentationRunner = "com.ee309.detectivegame.HiltTestRunner"
         vectorDrawables { useSupportLibrary = true }
-        
-        buildConfigField("String", "UPSTAGE_API_KEY", localProperties.getProperty("UPSTAGE_API_KEY", ""))
-        buildConfigField("String", "UPSTAGE_BASE_URL", localProperties.getProperty("UPSTAGE_BASE_URL", "https://api.upstage.ai/"))
+
+        val upstageApiKey = loadEnv("UPSTAGE_API_KEY") ?: ""
+        val upstageBaseUrl = loadEnv("UPSTAGE_BASE_URL") ?: ""
+
+        buildConfigField("String", "UPSTAGE_API_KEY", localProperties.getProperty("UPSTAGE_API_KEY", "\"${upstageApiKey}\""))
+        buildConfigField("String", "UPSTAGE_BASE_URL", localProperties.getProperty("UPSTAGE_BASE_URL", "\"${upstageBaseUrl}\""))
     }
 
     buildTypes {
