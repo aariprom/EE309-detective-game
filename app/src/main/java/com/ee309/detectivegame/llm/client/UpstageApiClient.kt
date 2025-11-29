@@ -1,18 +1,21 @@
 package com.ee309.detectivegame.llm.client
 
+import com.ee309.detectivegame.BuildConfig
+import com.google.gson.annotations.SerializedName
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import java.util.concurrent.TimeUnit
+import com.google.gson.JsonObject
 
 /**
  * Upstage API client interface
- * TODO: Update with actual Upstage API endpoints
  */
 interface UpstageApiService {
-    @POST("v1/chat/completions")
+    @POST("chat/completions")
     suspend fun chatCompletion(@Body request: ChatRequest): ChatResponse
 }
 
@@ -20,7 +23,11 @@ data class ChatRequest(
     val model: String,
     val messages: List<ChatMessage>,
     val temperature: Double = 0.7,
-    val max_tokens: Int = 1000
+    @SerializedName("max_tokens")
+    val maxTokens: Int,
+    val stream: Boolean = false,
+    @SerializedName("response_format")
+    val responseFormat: JsonObject?
 )
 
 data class ChatMessage(
@@ -36,25 +43,29 @@ data class ChatResponse(
 
 data class Choice(
     val message: ChatMessage,
-    val finish_reason: String?
+    @SerializedName("finish_reason")
+    val finishReason: String?
 )
 
 data class Usage(
-    val prompt_tokens: Int,
-    val completion_tokens: Int,
-    val total_tokens: Int
+    @SerializedName("prompt_tokens")
+    val promptTokens: Int,
+    @SerializedName("completion_tokens")
+    val completionTokens: Int,
+    @SerializedName("total_tokens")
+    val totalTokens: Int
 )
 
 object UpstageApiClient {
-    // TODO: Replace with actual Upstage API base URL
-    private const val BASE_URL = "https://api.upstage.ai/"
-    
-    fun createService(apiKey: String): UpstageApiService {
+    fun createService(apiKey: String, baseUrl: String = BuildConfig.UPSTAGE_BASE_URL): UpstageApiService {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
         
         val client = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(loggingInterceptor)
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
@@ -66,11 +77,10 @@ object UpstageApiClient {
             .build()
         
         return Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(baseUrl)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(UpstageApiService::class.java)
     }
 }
-

@@ -12,11 +12,8 @@ data class Clue(
     val id: String,
     val name: String = "Default Clue Name",
     val description: String = "Default Clue Description",
-    val who: String? = null, // Who is involved
-    val whom: String? = null, // Who is affected
-    val time: GameTime? = null, // When it happened
-    val place: String? = null, // Where it happened
-    val content: String, // What happened / description
+    // unique ID of which this clue can be found by INVESTIGATION
+    val location: String = "",
     val unlockConditions: List<String> = emptyList()
 ) {
     fun isUnlocked(flags: Map<String, Boolean>): Boolean {

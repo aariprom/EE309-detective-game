@@ -1,0 +1,5 @@
+# This is example for local.properties
+
+sdk.dir=/home/path/to/sdk
+UPSTAGE_API_KEY="upstage_api_key"
+UPSTAGE_BASE_URL="https://api.upstage.ai/v1/"
