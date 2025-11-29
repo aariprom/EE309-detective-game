@@ -49,7 +49,7 @@ jobs:
       with:
         name: coverage-reports
         path: |
-          app/build/reports/coverage/debug/**
+          app/build/reports/jacoco/jacocoDebugUnitTestReport/html/**
         if-no-files-found: warn
         retention-days: 30
         
