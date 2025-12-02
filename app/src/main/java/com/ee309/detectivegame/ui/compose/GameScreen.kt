@@ -248,9 +248,9 @@ private fun MainGameScreenContent(
     onAccuseClick: () -> Unit
 ) {
     val currentPlace = gameState.getCurrentLocation()
-    val timeRemaining = gameState.timeline.endTime.minutes - gameState.currentTime.minutes
-    val timeRemainingHours = timeRemaining / 60
-    val timeRemainingMinutes = timeRemaining % 60
+    val remainingTime = gameState.getRemainingTime()
+    val remainingTimeHours = remainingTime.hours
+    val remainingTimeMinutes = remainingTime.minutesOfHour
     
     Column(
         modifier = Modifier
@@ -266,7 +266,8 @@ private fun MainGameScreenContent(
             // Time display widget
             TimeDisplayWidget(
                 currentTime = gameState.currentTime,
-                timeRemaining = "$timeRemainingHours:${String.format("%02d", timeRemainingMinutes)}",
+                startTime = gameState.timeline.startTime,
+                timeRemaining = "$remainingTimeHours:${String.format("%02d", remainingTimeMinutes)}",
                 modifier = Modifier.weight(1f)
             )
             
@@ -310,6 +311,7 @@ private fun MainGameScreenContent(
 @Composable
 private fun TimeDisplayWidget(
     currentTime: com.ee309.detectivegame.domain.model.GameTime,
+    startTime: com.ee309.detectivegame.domain.model.GameTime,
     timeRemaining: String,
     modifier: Modifier = Modifier
 ) {
@@ -323,7 +325,7 @@ private fun TimeDisplayWidget(
             modifier = Modifier.padding(12.dp)
         ) {
             Text(
-                text = "Time: ${currentTime.format()}",
+                text = "Time: ${currentTime.formatWithStart(startTime)}",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
