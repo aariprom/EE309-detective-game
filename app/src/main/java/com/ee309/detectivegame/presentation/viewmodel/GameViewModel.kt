@@ -254,13 +254,32 @@ class GameViewModel @Inject constructor(
     private fun handleInvestigation(placeId: String, state: GameState): GameState {
         val place = state.getPlace(placeId) ?: return state
 
-        // Placeholder: Return description text
-        // TODO: Replace with LLM 3 (Description Generator) later
-
-        // For now, just return state with time advanced
+        // Get available clues at this location (already filtered by unlock conditions)
+        val availableClues = state.getAvailableCluesAtLocation(placeId)
+        
+        // Filter out clues the player already has
+        val newClueIds = availableClues
+            .map { it.id }
+            .filter { !state.player.collectedClues.contains(it) }
+        
+        // Start with time advancement
         // Time cost: 15 minutes (investigation time)
         val newTime = state.currentTime.addMinutes(15)
-        return state.copy(currentTime = newTime)
+        var newState = state.copy(currentTime = newTime)
+        
+        // Add new clues to player's collected clues
+        if (newClueIds.isNotEmpty()) {
+            val updatedCollectedClues = (state.player.collectedClues + newClueIds).distinct()
+            val updatedPlayer = state.player.copy(collectedClues = updatedCollectedClues)
+            newState = newState.copy(player = updatedPlayer)
+        }
+        
+        // Set investigation flag for this place (useful for future LLM 4 integration)
+        val investigationFlag = "investigated_${placeId}"
+        val updatedFlags = newState.flags + (investigationFlag to true)
+        newState = newState.copy(flags = updatedFlags)
+        
+        return newState
     }
 
     @OptIn(InternalSerializationApi::class)

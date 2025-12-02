@@ -59,6 +59,7 @@ fun GameScreen(
                 GamePhase.WIN, GamePhase.LOSE -> {
                     GameOverScreen(
                         phase = currentGameState.phase,
+                        gameState = currentGameState,
                         onRestart = {
                             viewModel.startNewGame("")
                             conversationCharacterId = null
