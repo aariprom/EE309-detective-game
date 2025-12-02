@@ -76,6 +76,7 @@ fun GameScreen(
                             ConversationScreen(
                                 character = character,
                                 messages = conversationHistory[charId] ?: emptyList(),
+                                gameState = currentGameState,
                                 isLoading = isLoading,
                                 onBack = { conversationCharacterId = null },
                                 onSendMessage = { message ->

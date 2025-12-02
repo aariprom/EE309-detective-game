@@ -119,8 +119,10 @@ fun GameState.toDialogueRequest(
         )
     }
     
-    // Convert conversation history
-    val history = conversationHistory?.map { msg ->
+    // Convert conversation history (exclude system messages)
+    val history = conversationHistory?.filter { msg ->
+        msg.type == com.ee309.detectivegame.ui.compose.ConversationMessageType.NORMAL
+    }?.map { msg ->
         ConversationHistoryItem(
             role = if (msg.isFromPlayer) "player" else "character",
             text = msg.text

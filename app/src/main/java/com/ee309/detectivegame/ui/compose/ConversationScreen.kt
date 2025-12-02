@@ -17,6 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ee309.detectivegame.domain.model.Character
+import com.ee309.detectivegame.domain.model.GameState
+import com.ee309.detectivegame.domain.model.GameTime
+import kotlinx.serialization.InternalSerializationApi
 
 /**
  * Conversation/Interrogation screen with chat-like interface for questioning characters.
@@ -26,6 +29,7 @@ import com.ee309.detectivegame.domain.model.Character
 fun ConversationScreen(
     character: Character,
     messages: List<ConversationMessage>,
+    gameState: GameState,
     isLoading: Boolean = false,
     onBack: () -> Unit,
     onSendMessage: (String) -> Unit,
@@ -56,6 +60,13 @@ fun ConversationScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
+                    // Clue progress indicator
+                    val (collected, total) = getClueProgress(character, gameState)
+                    Text(
+                        text = "Clues: $collected/$total found",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
                 }
             },
             navigationIcon = {
@@ -98,10 +109,16 @@ fun ConversationScreen(
                 }
             } else {
                 items(messages) { message ->
-                    ConversationMessageBubble(
-                        message = message,
-                        isFromPlayer = message.isFromPlayer
-                    )
+                    if (message.type == ConversationMessageType.SYSTEM) {
+                        SystemMessageBubble(message = message)
+                    } else {
+                        ConversationMessageBubble(
+                            message = message,
+                            isFromPlayer = message.isFromPlayer,
+                            previousMessage = messages.getOrNull(messages.indexOf(message) - 1),
+                            startTime = gameState.timeline.startTime
+                        )
+                    }
                 }
                 
                 // Show loading indicator when character is generating response
@@ -151,41 +168,138 @@ fun ConversationScreen(
  */
 data class ConversationMessage(
     val text: String,
-    val isFromPlayer: Boolean
+    val isFromPlayer: Boolean,
+    val timestamp: GameTime,
+    val type: ConversationMessageType = ConversationMessageType.NORMAL
 )
+
+/**
+ * Type of conversation message
+ */
+enum class ConversationMessageType {
+    NORMAL,  // Regular player/character messages
+    SYSTEM   // Game state change notifications
+}
 
 @Composable
 private fun ConversationMessageBubble(
     message: ConversationMessage,
     isFromPlayer: Boolean,
+    previousMessage: ConversationMessage?,
+    startTime: GameTime,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = if (isFromPlayer) Alignment.End else Alignment.Start
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (isFromPlayer) Arrangement.End else Arrangement.Start
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = if (isFromPlayer) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
+                tonalElevation = 2.dp,
+                modifier = Modifier.widthIn(max = 280.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = message.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isFromPlayer) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            }
+        }
+        // Time display
+        Text(
+            text = formatMessageTime(message.timestamp, previousMessage?.timestamp, startTime),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            modifier = Modifier.padding(
+                horizontal = 16.dp,
+                vertical = 2.dp
+            )
+        )
+    }
+}
+
+@Composable
+private fun SystemMessageBubble(
+    message: ConversationMessage,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (isFromPlayer) Arrangement.End else Arrangement.Start
+        horizontalArrangement = Arrangement.Center
     ) {
         Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = if (isFromPlayer) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-            tonalElevation = 2.dp,
-            modifier = Modifier.widthIn(max = 280.dp)
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+            tonalElevation = 1.dp,
+            modifier = Modifier.widthIn(max = 300.dp)
         ) {
             Text(
                 text = message.text,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(12.dp),
-                color = if (isFromPlayer) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.onTertiaryContainer
             )
         }
     }
+}
+
+/**
+ * Formats the time display for a message
+ */
+private fun formatMessageTime(
+    messageTime: GameTime,
+    previousTime: GameTime?,
+    startTime: GameTime
+): String {
+    val absoluteMessageTime = GameTime(startTime.minutes + messageTime.minutes)
+    
+    // If there's a previous message, show relative time
+    if (previousTime != null) {
+        val previousAbsoluteTime = GameTime(startTime.minutes + previousTime.minutes)
+        val minutesDiff = absoluteMessageTime.minutes - previousAbsoluteTime.minutes
+        
+        return when {
+            minutesDiff <= 0 -> "Just now"
+            minutesDiff < 5 -> "Just now"
+            minutesDiff < 60 -> "$minutesDiff min ago"
+            else -> absoluteMessageTime.format()
+        }
+    }
+    
+    // First message or no previous message - show absolute time
+    return absoluteMessageTime.format()
+}
+
+/**
+ * Calculates clue progress for a character
+ */
+@OptIn(InternalSerializationApi::class)
+private fun getClueProgress(character: Character, gameState: GameState): Pair<Int, Int> {
+    // Get total obtainable clues (character's knownClues that are unlocked)
+    val totalObtainable = character.knownClues
+        .mapNotNull { clueId -> gameState.getClue(clueId) }
+        .count { clue -> clue.isUnlocked(gameState.flags) }
+    
+    // Get collected clues (character's knownClues that player has)
+    val collected = character.knownClues
+        .count { clueId -> gameState.player.collectedClues.contains(clueId) }
+    
+    return Pair(collected, totalObtainable)
 }
 
 @Composable
