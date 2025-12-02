@@ -134,17 +134,30 @@ private const val MOCK_LLM1_RESPONSE = """
     }
   ],
   "timeline": {
+    "baseTime": {
+      "minutes": 960
+    },
     "startTime": {
-      "minutes": 0
+      "minutes": 1080
     },
     "endTime": {
-      "minutes": 480
+      "minutes": 1440
     },
     "events": [
       {
+        "id": "event_crime",
+        "time": {
+          "minutes": 1020
+        },
+        "eventType": "CRIME",
+        "description": "The crime occurs.",
+        "characterId": "char_alice",
+        "placeId": "place_office"
+      },
+      {
         "id": "event_alice_moves_to_office",
         "time": {
-          "minutes": 120
+          "minutes": 1200
         },
         "eventType": "CHARACTER_MOVEMENT",
         "description": "Alice moves to the CEO Office.",
@@ -154,7 +167,7 @@ private const val MOCK_LLM1_RESPONSE = """
       {
         "id": "event_power_outage",
         "time": {
-          "minutes": 180
+          "minutes": 1260
         },
         "eventType": "PLACE_CHANGE",
         "description": "The power goes out in the office.",
@@ -164,7 +177,7 @@ private const val MOCK_LLM1_RESPONSE = """
       {
         "id": "event_custom_scream",
         "time": {
-          "minutes": 240
+          "minutes": 1320
         },
         "eventType": "CUSTOM",
         "description": "A scream is heard from the parking lot.",

@@ -42,6 +42,7 @@ data class PublicPlaceInfo(
  */
 @Serializable
 data class PublicTimelineInfo(
+    val baseTime: TimeInfo,
     val startTime: TimeInfo,
     val endTime: TimeInfo
 )

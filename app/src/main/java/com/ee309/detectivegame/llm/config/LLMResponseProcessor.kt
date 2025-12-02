@@ -98,6 +98,18 @@ object LLMResponseProcessor {
             data class InvalidTimeline(
                 override val message: String = "Timeline is invalid: startTime must be before endTime"
             ) : ValidationError(message)
+            data class MissingBaseTime(
+                override val message: String = "Timeline is missing baseTime"
+            ) : ValidationError(message)
+            data class InvalidBaseTime(
+                override val message: String = "Timeline baseTime must be before startTime (all absolute times)"
+            ) : ValidationError(message)
+            data class MissingCrimeEvent(
+                override val message: String = "Timeline must contain exactly one CRIME event between baseTime and startTime"
+            ) : ValidationError(message)
+            data class InvalidCrimeEventTime(
+                override val message: String = "Crime event time must be between baseTime and startTime (all absolute times)"
+            ) : ValidationError(message)
             data class InvalidClueReference(
                 val clueId: String,
                 val locationId: String,
@@ -179,9 +191,34 @@ object LLMResponseProcessor {
                 ))
             }
             
-            // Validate timeline
-            if (gameState.timeline.startTime.minutes >= gameState.timeline.endTime.minutes) {
+            // Validate timeline structure - all times are absolute
+            val timeline = gameState.timeline
+            
+            // Validate timeline structure
+            if (timeline.baseTime.minutes >= timeline.startTime.minutes) {
+                errors.add(ValidationError.InvalidBaseTime())
+            }
+            
+            if (timeline.startTime.minutes >= timeline.endTime.minutes) {
                 errors.add(ValidationError.InvalidTimeline())
+            }
+            
+            // Validate crime event
+            val crimeEvents = timeline.getCrimeEvents()
+            if (crimeEvents.isEmpty()) {
+                errors.add(ValidationError.MissingCrimeEvent())
+            } else if (crimeEvents.size > 1) {
+                errors.add(ValidationError.MissingCrimeEvent()) // Should be exactly one
+            } else {
+                // Validate crime event time is between baseTime and startTime (all absolute)
+                val crimeEvent = crimeEvents.first()
+                val baseTimeMinutes = timeline.baseTime.minutes
+                val startTimeMinutes = timeline.startTime.minutes
+                val crimeTimeMinutes = crimeEvent.time.minutes
+                
+                if (crimeTimeMinutes <= baseTimeMinutes || crimeTimeMinutes >= startTimeMinutes) {
+                    errors.add(ValidationError.InvalidCrimeEventTime())
+                }
             }
             
             return errors

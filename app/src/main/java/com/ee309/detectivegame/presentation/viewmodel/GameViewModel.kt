@@ -191,7 +191,9 @@ class GameViewModel @Inject constructor(
         }
 
         // Check time limit
-        if (state.currentTime.isAfter(state.timeline.endTime)) {
+        // currentTime is relative to startTime, endTime is absolute
+        val currentAbsolute = state.timeline.startTime.minutes + state.currentTime.minutes
+        if (currentAbsolute >= state.timeline.endTime.minutes) {
             // TODO: how to show that this is lose due to time limit?
             transitionToPhase(GamePhase.LOSE)
             return

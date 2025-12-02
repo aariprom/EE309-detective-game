@@ -56,21 +56,30 @@ object LLMPrompt {
               - `unlock_conditions`: Same semantics as above.
             
             6. Timeline (`timeline`)
-            - `start_time` and `end_time`: ISO 8601 strings, e.g. `"2024-07-29T20:00:00Z"`. They define the investigation window.
-            - `events`: Each event must have:
+            - All times (baseTime, startTime, endTime, events) are stored as absolute times in minutes from midnight.
+            - `baseTime`: Absolute time reference point in minutes from midnight (e.g., 960 = 16:00, 4 PM).
+              This is the earliest point in the timeline. Must be < startTime.
+            - `startTime`: Absolute time in minutes from midnight when the game starts (e.g., 1080 = 18:00, 6 PM).
+              Must be > baseTime and < endTime.
+            - `endTime`: Absolute time in minutes from midnight when the game ends (e.g., 1440 = 24:00, midnight).
+              Must be > startTime.
+            - `events`: Chronological list of events. Each event must have:
               - `id`: Unique string ID, e.g. `"event_crime"`, `"event_alibi_check"`.
-              - `time`: ISO 8601 timestamp within the start/end range.
+              - `time`: Absolute time in minutes from midnight (same format as baseTime, startTime, endTime).
+                * For CRIME events: MUST be between baseTime.minutes and startTime.minutes.
+                * For game events: MUST be between startTime.minutes and endTime.minutes.
+              - `eventType`: One of `"CHARACTER_MOVEMENT"`, `"PLACE_CHANGE"`, `"CRIME"`, or `"CUSTOM"`.
               - `description`: What happens at this time.
-              - `effects`: List of changes in game state. Each effect has:
-                - `type`: One of `"MOVE_CHARACTER"`, `"REVEAL_CLUE"`, `"SET_FLAG"`.
-                - `target_id`: 
-                  - For `"MOVE_CHARACTER"`: a Character `id`.
-                  - For `"REVEAL_CLUE"`: a Clue `id`.
-                  - For `"SET_FLAG"`: a flag name.
-                - `details`:
-                  - For `"MOVE_CHARACTER"`: `destination` = Place `id`.
-                  - For `"SET_FLAG"`: `flag` = flag name.
-                  - For `"REVEAL_CLUE"`: `details` can be empty or `{}`.
+              - `characterId`: ID of character involved (for CHARACTER_MOVEMENT and CRIME events). Can be null.
+              - `placeId`: ID of place involved (for PLACE_CHANGE and CRIME events). Can be null.
+            
+            **CRITICAL REQUIREMENT FOR CRIME EVENT:**
+            - You MUST include exactly ONE event with `eventType = "CRIME"` in the events array.
+            - The crime event MUST occur BEFORE the game starts (between baseTime and startTime).
+            - The crime event's `time` must be: baseTime.minutes < crime_time < startTime.minutes.
+            - The crime event should describe the actual crime/murder that occurred.
+            - Example: If baseTime is 960 (16:00) and startTime is 1080 (18:00), the crime must occur between 16:00 and 18:00.
+              A good crime time would be around 17:00-17:30 (1020-1050 minutes).
             
             7. Player (`player`)
             - `current_location`: Must be a valid Place `id`.
