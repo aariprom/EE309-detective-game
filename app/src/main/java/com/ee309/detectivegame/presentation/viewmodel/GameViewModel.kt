@@ -17,6 +17,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.json.Json
 import com.ee309.detectivegame.ui.compose.ConversationMessage
+import com.ee309.detectivegame.domain.model.ActionTimeCosts
+import com.ee309.detectivegame.llm.model.DialogueRequest
+import com.ee309.detectivegame.llm.model.toDialogueRequest
 import javax.inject.Inject
 
 @HiltViewModel
@@ -244,21 +247,107 @@ class GameViewModel @Inject constructor(
     }
 
     @OptIn(InternalSerializationApi::class)
-    private fun handleQuestioning(characterId: String, question: String?, state: GameState): GameState {
+    private suspend fun handleQuestioning(characterId: String, question: String?, state: GameState): GameState {
         val character = state.getCharacter(characterId) ?: return state
 
         // sanity check: is character in this place?
-        if (character.currentLocation !== state.player.currentLocation) {
+        if (character.currentLocation != state.player.currentLocation) {
             return state
         }
 
-        // Placeholder: Return dialogue text
-        // TODO: Replace with LLM 3 (Dialogue Generator) later
-
-        // For now, just return state with time advanced
-        // Time cost: 20 minutes (questioning time)
-        val newTime = state.currentTime.addMinutes(20)
-        return state.copy(currentTime = newTime)
+        // Get conversation history for this character
+        val history = getConversationHistory(characterId)
+        
+        // Build dialogue request
+        val dialogueRequest = try {
+            state.toDialogueRequest(
+                characterId = characterId,
+                playerQuestion = question ?: "Hello, can you tell me about what happened?",
+                conversationHistory = history
+            )
+        } catch (e: Exception) {
+            _uiState.value = GameUiState.Error("Failed to build dialogue request: ${e.message}")
+            return state
+        }
+        
+        // Serialize request to JSON
+        val requestJson = json.encodeToString(
+            DialogueRequest.serializer(),
+            dialogueRequest
+        )
+        
+        // Call LLM 3: Dialogue Generator
+        val dialogueResponse = try {
+            llmRepository.callUpstage(
+                task = LLMTask.DialogueGenerator,
+                userContent = requestJson,
+                maxTokens = 2000
+            )
+        } catch (e: Exception) {
+            _uiState.value = GameUiState.Error("Failed to generate dialogue: ${e.message ?: "Unknown error"}")
+            return state
+        }
+        
+        // Process the LLM 3 response
+        val dialogueResult = LLMResponseProcessor.DialogueGenerator.process(dialogueResponse)
+        
+        val dialogueData = when (dialogueResult) {
+            is LLMResponseProcessor.ProcessingResult.Success -> {
+                dialogueResult.data
+            }
+            is LLMResponseProcessor.ProcessingResult.Failure -> {
+                _uiState.value = GameUiState.Error("Failed to process dialogue: ${dialogueResult.error.message}")
+                return state
+            }
+        }
+        
+        // Validate clue IDs if new clues were revealed
+        if (dialogueData.newClues != null && dialogueData.newClues.isNotEmpty()) {
+            val clueValidationErrors = LLMResponseProcessor.DialogueGenerator.validateClueIds(dialogueData, state)
+            if (clueValidationErrors.isNotEmpty()) {
+                // Log warning but continue - invalid clues will be filtered out
+                // Could also return error if strict validation is needed
+            }
+        }
+        
+        // Add player's question to conversation history
+        val playerQuestionText = question ?: "Hello, can you tell me about what happened?"
+        addConversationMessage(characterId, ConversationMessage(playerQuestionText, true))
+        
+        // Add character's response to conversation history
+        addConversationMessage(characterId, ConversationMessage(dialogueData.dialogue, false))
+        
+        // Update game state
+        var newState = state
+        
+        // Add new clues to player's collected clues (if valid)
+        val validNewClues = dialogueData.newClues?.filter { clueId ->
+            state.getClue(clueId) != null
+        } ?: emptyList()
+        
+        if (validNewClues.isNotEmpty()) {
+            val updatedCollectedClues = (state.player.collectedClues + validNewClues).distinct()
+            val updatedPlayer = state.player.copy(collectedClues = updatedCollectedClues)
+            newState = newState.copy(player = updatedPlayer)
+        }
+        
+        // Update character's mental state if changed
+        if (dialogueData.mentalStateUpdate != null) {
+            val updatedCharacters = newState.characters.map { char ->
+                if (char.id == characterId) {
+                    char.copy(mentalState = dialogueData.mentalStateUpdate)
+                } else {
+                    char
+                }
+            }
+            newState = newState.copy(characters = updatedCharacters)
+        }
+        
+        // Advance time by questioning time cost
+        val newTime = newState.currentTime.addMinutes(ActionTimeCosts.QUESTIONING_TIME)
+        newState = newState.copy(currentTime = newTime)
+        
+        return newState
     }
 
     @OptIn(InternalSerializationApi::class)

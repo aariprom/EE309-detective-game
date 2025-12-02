@@ -347,4 +347,111 @@ object LLMResponseProcessor {
             return errors
         }
     }
+    
+    /**
+     * Processor for LLM 3: DialogueGenerator
+     * Handles parsing and validation of dialogue responses.
+     */
+    object DialogueGenerator {
+        
+        /**
+         * DialogueGenerator-specific validation errors
+         */
+        sealed class ValidationError(override val message: String) : LLMResponseProcessor.ValidationError(message) {
+            data class EmptyDialogue(override val message: String = "Dialogue text is empty") : ValidationError(message)
+            data class DialogueTooLong(
+                val length: Int,
+                override val message: String = "Dialogue text is too long (maximum 1000 characters, got $length)"
+            ) : ValidationError(message)
+            data class InvalidClueId(
+                val clueId: String,
+                override val message: String = "Invalid clue ID in newClues: $clueId"
+            ) : ValidationError(message)
+        }
+        
+        /**
+         * Processes a raw LLM response for dialogue.
+         * DialogueGenerator returns JSON with dialogue, optional newClues, mentalStateUpdate, and hints.
+         * 
+         * @param rawResponse The raw response string from the LLM
+         * @return ProcessingResult with DialogueResponse on success, or ValidationError on failure
+         */
+        @OptIn(InternalSerializationApi::class)
+        fun process(rawResponse: String): ProcessingResult<com.ee309.detectivegame.llm.model.DialogueResponse> {
+            // Check for empty response
+            if (rawResponse.isBlank()) {
+                return ProcessingResult.Failure(
+                    LLMResponseProcessor.ValidationError.EmptyResponse()
+                )
+            }
+            
+            // Parse JSON response
+            val parseResult = parseJson(rawResponse, com.ee309.detectivegame.llm.model.DialogueResponse.serializer())
+            val dialogueResponse = parseResult.getOrElse { exception ->
+                return ProcessingResult.Failure(
+                    LLMResponseProcessor.ValidationError.JsonParseError(exception.message ?: "Unknown parsing error")
+                )
+            }
+            
+            // Validate dialogue response
+            val validationErrors = validate(dialogueResponse)
+            if (validationErrors.isNotEmpty()) {
+                return ProcessingResult.Failure(validationErrors.first())
+            }
+            
+            return ProcessingResult.Success(dialogueResponse)
+        }
+        
+        /**
+         * Validates dialogue response to ensure it meets requirements.
+         * 
+         * @param dialogueResponse The dialogue response to validate
+         * @return List of validation errors (empty if valid)
+         */
+        fun validate(dialogueResponse: com.ee309.detectivegame.llm.model.DialogueResponse): List<ValidationError> {
+            val errors = mutableListOf<ValidationError>()
+            
+            val dialogue = dialogueResponse.dialogue.trim()
+            
+            if (dialogue.isBlank()) {
+                errors.add(ValidationError.EmptyDialogue())
+            }
+            
+            if (dialogue.length > 1000) {
+                errors.add(ValidationError.DialogueTooLong(dialogue.length))
+            }
+            
+            // Note: Clue ID validation should be done in GameViewModel where we have access to GameState
+            // We can't validate clue IDs here without GameState context
+            
+            return errors
+        }
+        
+        /**
+         * Validates that clue IDs in newClues exist in the game state.
+         * This should be called from GameViewModel where GameState is available.
+         * 
+         * @param dialogueResponse The dialogue response containing newClues
+         * @param gameState The current game state to validate against
+         * @return List of validation errors (empty if valid)
+         */
+        @OptIn(InternalSerializationApi::class)
+        fun validateClueIds(
+            dialogueResponse: com.ee309.detectivegame.llm.model.DialogueResponse,
+            gameState: com.ee309.detectivegame.domain.model.GameState
+        ): List<ValidationError> {
+            val errors = mutableListOf<ValidationError>()
+            
+            val newClues = dialogueResponse.newClues ?: return errors
+            
+            for (clueId in newClues) {
+                val clue = gameState.getClue(clueId)
+                if (clue == null) {
+                    errors.add(ValidationError.InvalidClueId(clueId))
+                }
+            }
+            
+            return errors
+        }
+    }
 }
