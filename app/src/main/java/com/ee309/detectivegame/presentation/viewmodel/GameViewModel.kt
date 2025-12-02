@@ -4,17 +4,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ee309.detectivegame.domain.model.GameState
 import com.ee309.detectivegame.presentation.state.GameUiState
-import com.ee309.detectivegame.domain.generator.MockGameData.createInitialGameState
 import com.ee309.detectivegame.domain.model.GameAction
 import com.ee309.detectivegame.domain.model.GamePhase
+import com.ee309.detectivegame.llm.config.LLMTask
+import com.ee309.detectivegame.llm.config.LLMResponseProcessor
+import com.ee309.detectivegame.llm.data.LLMRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
 import com.ee309.detectivegame.ui.compose.ConversationMessage
+import javax.inject.Inject
 
-class GameViewModel : ViewModel() {
+@HiltViewModel
+class GameViewModel @Inject constructor(
+    private val llmRepository: LLMRepository
+) : ViewModel() {
     
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -36,14 +43,32 @@ class GameViewModel : ViewModel() {
             _uiState.value = GameUiState.Loading
             _conversationHistory.value = emptyMap() // Clear conversation history
             try {
-                // TODO: Call LLM 1 to generate initial game content
-                // For now, we use mocking game data for testing
-                // This can be possibly used as TUTORIAL as well
-                val initialState = createInitialGameState()
-                _gameState.value = initialState
-                _uiState.value = GameUiState.Success(initialState)
+                // Call LLM 1 to generate initial game content
+                val userContent = keywords.ifBlank { "Generate a detective mystery game scenario" }
+                val rawResponse = llmRepository.callUpstage(
+                    task = LLMTask.GameInitializer,
+                    userContent = userContent,
+                    maxTokens = 10000
+                )
+                
+                // Process the LLM response: parse, validate, and convert to GameState
+                val result = LLMResponseProcessor.processGameInitializerResponse(rawResponse)
+                
+                when (result) {
+                    is LLMResponseProcessor.ProcessingResult.Success -> {
+                        _gameState.value = result.gameState
+                        _uiState.value = GameUiState.Success(result.gameState)
+                    }
+                    is LLMResponseProcessor.ProcessingResult.Failure -> {
+                        _uiState.value = GameUiState.Error(
+                            "Failed to generate game: ${result.error.message}"
+                        )
+                    }
+                }
             } catch (e: Exception) {
-                _uiState.value = GameUiState.Error(e.message ?: "Unknown error")
+                _uiState.value = GameUiState.Error(
+                    "Failed to generate game: ${e.message ?: "Unknown error"}"
+                )
             }
         }
     }
