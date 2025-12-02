@@ -103,12 +103,14 @@ data class TimeResponse(
 @InternalSerializationApi
 @Serializable
 data class TimelineResponse(
+    val baseTime: TimeResponse,
     val startTime: TimeResponse,
     val endTime: TimeResponse,
     val events: List<TimelineEventResponse>
 ) {
     fun toTimeline(): Timeline {
         return Timeline(
+            baseTime = baseTime.toGameTime(),
             startTime = startTime.toGameTime(),
             endTime = endTime.toGameTime(),
             events = events.map { it.toTimelineEvent() }

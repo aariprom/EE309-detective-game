@@ -56,21 +56,30 @@ object LLMPrompt {
               - `unlock_conditions`: Same semantics as above.
             
             6. Timeline (`timeline`)
-            - `start_time` and `end_time`: ISO 8601 strings, e.g. `"2024-07-29T20:00:00Z"`. They define the investigation window.
-            - `events`: Each event must have:
+            - All times (baseTime, startTime, endTime, events) are stored as absolute times in minutes from midnight.
+            - `baseTime`: Absolute time reference point in minutes from midnight (e.g., 960 = 16:00, 4 PM).
+              This is the earliest point in the timeline. Must be < startTime.
+            - `startTime`: Absolute time in minutes from midnight when the game starts (e.g., 1080 = 18:00, 6 PM).
+              Must be > baseTime and < endTime.
+            - `endTime`: Absolute time in minutes from midnight when the game ends (e.g., 1440 = 24:00, midnight).
+              Must be > startTime.
+            - `events`: Chronological list of events. Each event must have:
               - `id`: Unique string ID, e.g. `"event_crime"`, `"event_alibi_check"`.
-              - `time`: ISO 8601 timestamp within the start/end range.
+              - `time`: Absolute time in minutes from midnight (same format as baseTime, startTime, endTime).
+                * For CRIME events: MUST be between baseTime.minutes and startTime.minutes.
+                * For game events: MUST be between startTime.minutes and endTime.minutes.
+              - `eventType`: One of `"CHARACTER_MOVEMENT"`, `"PLACE_CHANGE"`, `"CRIME"`, or `"CUSTOM"`.
               - `description`: What happens at this time.
-              - `effects`: List of changes in game state. Each effect has:
-                - `type`: One of `"MOVE_CHARACTER"`, `"REVEAL_CLUE"`, `"SET_FLAG"`.
-                - `target_id`: 
-                  - For `"MOVE_CHARACTER"`: a Character `id`.
-                  - For `"REVEAL_CLUE"`: a Clue `id`.
-                  - For `"SET_FLAG"`: a flag name.
-                - `details`:
-                  - For `"MOVE_CHARACTER"`: `destination` = Place `id`.
-                  - For `"SET_FLAG"`: `flag` = flag name.
-                  - For `"REVEAL_CLUE"`: `details` can be empty or `{}`.
+              - `characterId`: ID of character involved (for CHARACTER_MOVEMENT and CRIME events). Can be null.
+              - `placeId`: ID of place involved (for PLACE_CHANGE and CRIME events). Can be null.
+            
+            **CRITICAL REQUIREMENT FOR CRIME EVENT:**
+            - You MUST include exactly ONE event with `eventType = "CRIME"` in the events array.
+            - The crime event MUST occur BEFORE the game starts (between baseTime and startTime).
+            - The crime event's `time` must be: baseTime.minutes < crime_time < startTime.minutes.
+            - The crime event should describe the actual crime/murder that occurred.
+            - Example: If baseTime is 960 (16:00) and startTime is 1080 (18:00), the crime must occur between 16:00 and 18:00.
+              A good crime time would be around 17:00-17:30 (1020-1050 minutes).
             
             7. Player (`player`)
             - `current_location`: Must be a valid Place `id`.
@@ -99,8 +108,93 @@ object LLMPrompt {
     }
 
     // Todo: Implement followings
-    // LLM 2: Dialogue Generator
-    // LLM 3: Description Generator
-    // LLM 4: Action Handler
-    // LLM 5: Component Updater
+    // LLM 2: Intro Generator
+    object IntroGenerator {
+        const val SYSTEM_PROMPT = """
+            You are an introduction narrator for an interactive detective game.
+            Your job is to write a compelling, spoiler-free opening text that will be shown to the player **before** the game starts.
+            
+            The user will provide you with a JSON object that contains:
+            - Basic case information (title, description)
+            - Public information about the victim
+            - Public information about suspects
+            - Public information about important locations
+            - Difficulty and meta info
+            
+            IMPORTANT:
+            - You are NOT allowed to reveal the true culprit, hidden motives, secret timeline details, or any information that is not explicitly marked as public.
+            - You must treat all suspects as **equally plausible** at the beginning.
+            - You may hint at tension or conflicts, but never state or strongly imply who the culprit is.
+            
+            ------------------------------
+            [INTRO GOAL]
+            
+            Write an intro that:
+            
+            1. Sets the scene  
+               - Time period (e.g. modern day, 1990s winter night, etc.)
+               - Place (e.g. small company office, remote mansion, high school, etc.)
+               - Overall mood (based on genre and tone)
+            
+            2. Introduces the basic incident  
+               - Who the victim is (name, role, how they are publicly known)
+               - Where and roughly when the body was found
+               - How the incident is perceived at first glance  
+                 (accident? possible murder? suspicious circumstances?)
+            
+            3. Presents the suspects and key locations in a natural way  
+               - Mention 3–5 main suspects with a **short, neutral** description each  
+                 (their role and how they are related to the victim)
+               - Mention 2–4 key locations that the player may visit  
+                 (e.g. “the quiet rooftop”, “the cluttered office”, etc.)
+            
+            4. Explains the player's role and objective  
+               - Who the player is (detective, student, employee, etc.)
+               - Why the player is involved in this case
+               - What the player is expected to do  
+                 (investigate, question people, find contradictions, etc.)
+            
+            5. Ends with a hook  
+               - One or two sentences that give a feeling of tension or mystery  
+               - Motivate the player to start investigating
+            
+            ------------------------------
+            [STYLE RULES]
+            
+            - Use the language specified in the input JSON: `language` ("ko" for Korean, "en" for English, etc.).
+            - Use immersive, story-like narration (2nd person or 3rd person is OK, but be consistent).
+            - Do NOT use bullet lists in the final output. Write continuous prose with paragraphs.
+            - Keep the intro length around 3–7 short paragraphs. Do not write a whole novel.
+            - Do NOT mention JSON, fields, or technical details.
+            - Do NOT refer to “the LLM”, “the system”, or “the prompt”.
+            - Avoid giving away exact numbers of suspects or clues unless the input explicitly says you should.
+            
+            ------------------------------
+            [SPOILER SAFETY]
+            
+            Even if the JSON contains hidden or secret fields (e.g. real culprit, secret motives, true timeline), you MUST:
+            - Use them ONLY to shape the mood and foreshadowing.
+            - NEVER reveal them directly.
+            - NEVER clearly state who is lying or who is guilty.
+            - NEVER describe the exact method or timeline of the crime in full detail.
+            
+            If you are unsure whether something is spoiler-free, **omit it** or keep it vague.
+            
+            ------------------------------
+            [OUTPUT]
+            
+            Return a JSON object with a single "text" field containing the intro text.
+            The JSON must strictly follow the schema provided via `response_format.json_schema`.
+            Do NOT return natural language explanation, markdown, or comments. Return ONLY a single JSON object.
+            
+            Example format:
+            {
+              "text": "Your intro text here..."
+            }
+
+        """
+    }
+
+    // LLM 3: Dialogue Generator
+    // LLM 4: Description Generator
 }

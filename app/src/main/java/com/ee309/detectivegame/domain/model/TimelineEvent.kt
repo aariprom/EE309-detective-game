@@ -22,6 +22,7 @@ data class TimelineEvent(
     enum class EventType {
         PLACE_CHANGE, // Place state changes
         CHARACTER_MOVEMENT, // Character moves
+        CRIME, // Crime event (occurs before game starts, between baseTime and startTime)
         CUSTOM // Custom event
     }
 }

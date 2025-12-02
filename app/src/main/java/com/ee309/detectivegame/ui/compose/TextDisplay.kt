@@ -43,8 +43,8 @@ fun TextDisplay(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(16.dp)
             )
-            
-            Divider()
+
+            HorizontalDivider()
             
             // Scrollable message list
             if (messages.isEmpty()) {

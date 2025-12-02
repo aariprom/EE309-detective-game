@@ -4,17 +4,25 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ee309.detectivegame.domain.model.GameState
 import com.ee309.detectivegame.presentation.state.GameUiState
-import com.ee309.detectivegame.domain.generator.MockGameData.createInitialGameState
 import com.ee309.detectivegame.domain.model.GameAction
 import com.ee309.detectivegame.domain.model.GamePhase
+import com.ee309.detectivegame.llm.config.LLMTask
+import com.ee309.detectivegame.llm.config.LLMResponseProcessor
+import com.ee309.detectivegame.llm.data.LLMRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.json.Json
 import com.ee309.detectivegame.ui.compose.ConversationMessage
+import javax.inject.Inject
 
-class GameViewModel : ViewModel() {
+@HiltViewModel
+class GameViewModel @Inject constructor(
+    private val llmRepository: LLMRepository
+) : ViewModel() {
     
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -24,6 +32,17 @@ class GameViewModel : ViewModel() {
     
     private val _conversationHistory = MutableStateFlow<Map<String, List<ConversationMessage>>>(emptyMap())
     val conversationHistory: StateFlow<Map<String, List<ConversationMessage>>> = _conversationHistory.asStateFlow()
+    
+    private val _introText = MutableStateFlow<String?>(null)
+    val introText: StateFlow<String?> = _introText.asStateFlow()
+    
+    private val _introShown = MutableStateFlow<Boolean>(false)
+    val introShown: StateFlow<Boolean> = _introShown.asStateFlow()
+    
+    private val json = Json {
+        ignoreUnknownKeys = true
+        prettyPrint = false
+    }
     
     init {
         // GameUIState Error with empty message indicates initial state
@@ -35,16 +54,84 @@ class GameViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = GameUiState.Loading
             _conversationHistory.value = emptyMap() // Clear conversation history
+            _introText.value = null // Clear intro text
+            _introShown.value = false // Reset intro shown flag
             try {
-                // TODO: Call LLM 1 to generate initial game content
-                // For now, we use mocking game data for testing
-                // This can be possibly used as TUTORIAL as well
-                val initialState = createInitialGameState()
-                _gameState.value = initialState
-                _uiState.value = GameUiState.Success(initialState)
+                // Step 1: Call LLM 1 to generate initial game content
+                val userContent = keywords.ifBlank { "Generate a detective mystery game scenario" }
+                val gameStateResponse = llmRepository.callUpstage(
+                    task = LLMTask.GameInitializer,
+                    userContent = userContent,
+                    maxTokens = 10000
+                )
+                
+                // Process the LLM 1 response: parse, validate, and convert to GameState
+                val gameStateResult = LLMResponseProcessor.GameInitializer.process(gameStateResponse)
+                
+                val gameState = when (gameStateResult) {
+                    is LLMResponseProcessor.ProcessingResult.Success -> {
+                        gameStateResult.data
+                    }
+                    is LLMResponseProcessor.ProcessingResult.Failure -> {
+                        _uiState.value = GameUiState.Error(
+                            "Failed to generate game: ${gameStateResult.error.message}"
+                        )
+                        return@launch
+                    }
+                }
+                
+                // Store game state (but don't show main game yet - need intro first)
+                _gameState.value = gameState
+                
+                // Step 2: Call LLM 2 to generate intro text
+                val introRequest = gameState.toIntroRequest()
+                val introRequestJson = json.encodeToString(
+                    com.ee309.detectivegame.llm.model.IntroRequest.serializer(),
+                    introRequest
+                )
+                
+                val introResponse = llmRepository.callUpstage(
+                    task = LLMTask.IntroGenerator,
+                    userContent = introRequestJson,
+                    maxTokens = 2000
+                )
+                
+                // Process the LLM 2 response: parse and validate intro text
+                val introResult = LLMResponseProcessor.IntroGenerator.process(introResponse)
+                
+                when (introResult) {
+                    is LLMResponseProcessor.ProcessingResult.Success -> {
+                        _introText.value = introResult.data
+                        // Keep UI in Loading state - IntroScreen will handle display
+                        // The game state is set, but intro needs to be shown first
+                    }
+                    is LLMResponseProcessor.ProcessingResult.Failure -> {
+                        // If intro generation fails, still allow game to start
+                        // but log the error
+                        _uiState.value = GameUiState.Error(
+                            "Failed to generate intro: ${introResult.error.message}. Starting game without intro."
+                        )
+                        // Mark intro as shown so game can start
+                        _introShown.value = true
+                        _uiState.value = GameUiState.Success(gameState)
+                    }
+                }
             } catch (e: Exception) {
-                _uiState.value = GameUiState.Error(e.message ?: "Unknown error")
+                _uiState.value = GameUiState.Error(
+                    "Failed to generate game: ${e.message ?: "Unknown error"}"
+                )
             }
+        }
+    }
+    
+    /**
+     * Called when user finishes reading the intro and wants to start the game
+     */
+    fun onIntroComplete() {
+        _introShown.value = true
+        val currentGameState = _gameState.value
+        if (currentGameState != null) {
+            _uiState.value = GameUiState.Success(currentGameState)
         }
     }
     
@@ -104,7 +191,9 @@ class GameViewModel : ViewModel() {
         }
 
         // Check time limit
-        if (state.currentTime.isAfter(state.timeline.endTime)) {
+        // currentTime is relative to startTime, endTime is absolute
+        val currentAbsolute = state.timeline.startTime.minutes + state.currentTime.minutes
+        if (currentAbsolute >= state.timeline.endTime.minutes) {
             // TODO: how to show that this is lose due to time limit?
             transitionToPhase(GamePhase.LOSE)
             return
@@ -164,7 +253,7 @@ class GameViewModel : ViewModel() {
         }
 
         // Placeholder: Return dialogue text
-        // TODO: Replace with LLM 2 (Dialogue Generator) later
+        // TODO: Replace with LLM 3 (Dialogue Generator) later
 
         // For now, just return state with time advanced
         // Time cost: 20 minutes (questioning time)

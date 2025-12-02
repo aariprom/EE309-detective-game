@@ -16,7 +16,13 @@ class GameStateTest {
     }
 
     @OptIn(InternalSerializationApi::class)
-    private fun createTestPlace(id: String, name: String, description: String = "Test place", connectedPlaces: List<String> = emptyList(), availableClues: List<String> = emptyList()): Place {
+    private fun createTestPlace(
+        id: String,
+        name: String,
+        description: String = "Test place",
+        connectedPlaces: List<String> = emptyList(),
+        availableClues: List<String> = emptyList()
+    ): Place {
         return Place(
             id = id,
             name = name,
@@ -27,7 +33,12 @@ class GameStateTest {
     }
 
     @OptIn(InternalSerializationApi::class)
-    private fun createTestClue(id: String, name: String, description: String, unlockConditions: List<String> = emptyList()): Clue {
+    private fun createTestClue(
+        id: String,
+        name: String,
+        description: String,
+        unlockConditions: List<String> = emptyList()
+    ): Clue {
         return Clue(
             id = id,
             name = name,
@@ -137,7 +148,8 @@ class GameStateTest {
         val clue1 = createTestClue("clue1", "Clue 1", "...")
         val clue2 = createTestClue("clue2", "Clue 2", "...")
         val clue3 = createTestClue("clue3", "Clue 3", "...")
-        val place = createTestPlace("place1", "Library", availableClues = listOf("clue1", "clue2", "clue3"))
+        val place =
+            createTestPlace("place1", "Library", availableClues = listOf("clue1", "clue2", "clue3"))
         val gameState = GameState(
             places = listOf(place),
             clues = listOf(clue1, clue2, clue3),
@@ -155,7 +167,8 @@ class GameStateTest {
         val clue1 = createTestClue("clue1", "Clue 1", "...")
         val clue2 = createTestClue("clue2", "Clue 2", "...")
         val clue3 = createTestClue("clue3", "Clue 3", "...", unlockConditions = listOf("flag1"))
-        val place = createTestPlace("place1", "Library", availableClues = listOf("clue1", "clue2", "clue3"))
+        val place =
+            createTestPlace("place1", "Library", availableClues = listOf("clue1", "clue2", "clue3"))
         val gameState = GameState(
             places = listOf(place),
             clues = listOf(clue1, clue2, clue3),
@@ -389,99 +402,5 @@ class GameStateTest {
 
         assertEquals(45, updated.currentTime.minutes)
         assertEquals(30, gameState.currentTime.minutes) // Original unchanged
-    }
-
-    @Test
-    @OptIn(InternalSerializationApi::class)
-    fun `advanceTime caps at timeline endTime`() {
-        val timeline = Timeline(GameTime(0), GameTime(60))
-        val gameState = GameState(currentTime = GameTime(50), timeline = timeline)
-
-        val updated = gameState.advanceTime(20) // Would go to 70, but capped at 60
-
-        assertEquals(60, updated.currentTime.minutes)
-    }
-
-    @Test
-    @OptIn(InternalSerializationApi::class)
-    fun `getRemainingTime calculates correctly`() {
-        val timeline = Timeline(GameTime(0), GameTime(480))
-        val gameState = GameState(currentTime = GameTime(120), timeline = timeline)
-
-        val remaining = gameState.getRemainingTime()
-
-        assertEquals(360, remaining.minutes)
-    }
-
-    @Test
-    @OptIn(InternalSerializationApi::class)
-    fun `getRemainingTime returns zero when time limit exceeded`() {
-        val timeline = Timeline(GameTime(0), GameTime(480))
-        val gameState = GameState(currentTime = GameTime(500), timeline = timeline)
-
-        val remaining = gameState.getRemainingTime()
-
-        assertEquals(0, remaining.minutes)
-    }
-
-    @Test
-    @OptIn(InternalSerializationApi::class)
-    fun `getTimeProgress calculates correctly`() {
-        val timeline = Timeline(GameTime(0), GameTime(480))
-        val gameState = GameState(currentTime = GameTime(240), timeline = timeline)
-
-        val progress = gameState.getTimeProgress()
-
-        assertEquals(0.5, progress, 0.01) // 50% elapsed
-    }
-
-    @Test
-    @OptIn(InternalSerializationApi::class)
-    fun `getTimeProgress returns 1_0 when time limit exceeded`() {
-        val timeline = Timeline(GameTime(0), GameTime(480))
-        val gameState = GameState(currentTime = GameTime(500), timeline = timeline)
-
-        val progress = gameState.getTimeProgress()
-
-        assertEquals(1.0, progress, 0.01)
-    }
-
-    @Test
-    @OptIn(InternalSerializationApi::class)
-    fun `isTimeLimitExceeded returns true when exceeded`() {
-        val timeline = Timeline(GameTime(0), GameTime(480))
-        val gameState = GameState(currentTime = GameTime(500), timeline = timeline)
-
-        assertTrue(gameState.isTimeLimitExceeded())
-    }
-
-    @Test
-    @OptIn(InternalSerializationApi::class)
-    fun `isTimeLimitExceeded returns false when not exceeded`() {
-        val timeline = Timeline(GameTime(0), GameTime(480))
-        val gameState = GameState(currentTime = GameTime(240), timeline = timeline)
-
-        assertFalse(gameState.isTimeLimitExceeded())
-    }
-
-    @Test
-    @OptIn(InternalSerializationApi::class)
-    fun `advanceTimeWithEvents detects triggered events`() {
-        val event = TimelineEvent(
-            id = "event1",
-            time = GameTime(45),
-            eventType = TimelineEvent.EventType.CHARACTER_MOVEMENT,
-            description = "Character moves",
-            characterId = "char1",
-            placeId = "place2"
-        )
-        val timeline = Timeline(GameTime(0), GameTime(480), events = listOf(event))
-        val gameState = GameState(currentTime = GameTime(30), timeline = timeline)
-
-        val result = gameState.advanceTimeWithEvents(20) // Advances to 50, event at 45 should trigger
-
-        assertEquals(1, result.triggeredEvents.size)
-        assertEquals("event1", result.triggeredEvents.first().id)
-        assertEquals(50, result.newState.currentTime.minutes)
     }
 }

@@ -137,12 +137,21 @@ object MockGameData {
 
     private fun createMockTimeline(): Timeline {
         return Timeline(
-            startTime = GameTime(0),
-            endTime = GameTime(480),
+            baseTime = GameTime(960),   // 16:00 (4 PM) - earliest point
+            startTime = GameTime(1080), // 18:00 (6 PM) - game starts
+            endTime = GameTime(1440),   // 24:00 (midnight) - game ends
             events = listOf(
                 TimelineEvent(
+                    id = "event_crime",
+                    time = GameTime(1020), // 17:00 (5 PM) - between baseTime and startTime
+                    eventType = TimelineEvent.EventType.CRIME,
+                    description = "The crime occurs.",
+                    characterId = "char_alice",
+                    placeId = "place_office"
+                ),
+                TimelineEvent(
                     id = "event_alice_moves_to_office",
-                    time = GameTime(120),
+                    time = GameTime(1200), // 20:00 (8 PM) - after game starts
                     eventType = TimelineEvent.EventType.CHARACTER_MOVEMENT,
                     description = "Alice moves to the CEO Office.",
                     characterId = "char_alice",
@@ -150,7 +159,7 @@ object MockGameData {
                 ),
                 TimelineEvent(
                     id = "event_power_outage",
-                    time = GameTime(180),
+                    time = GameTime(1260), // 21:00 (9 PM) - after game starts
                     eventType = TimelineEvent.EventType.PLACE_CHANGE,
                     description = "The power goes out in the office.",
                     characterId = null,
@@ -158,7 +167,7 @@ object MockGameData {
                 ),
                 TimelineEvent(
                     id = "event_custom_scream",
-                    time = GameTime(240),
+                    time = GameTime(1320), // 22:00 (10 PM) - after game starts
                     eventType = TimelineEvent.EventType.CUSTOM,
                     description = "A scream is heard from the parking lot.",
                     characterId = null,

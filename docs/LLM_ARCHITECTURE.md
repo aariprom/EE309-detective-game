@@ -74,9 +74,33 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 
 ---
 
-### Phase 2: Runtime Generation (Lazy Loading)
+### Phase 2: Initial Intro Generation
 
-#### LLM 2: Dialogue Generator
+#### LLM 2: Intro Generator
+
+**When**: After LLM 1 generates GameState, before game starts
+
+**Purpose**: Generate compelling, spoiler-free introduction text
+
+**Input**:
+- Public information from GameState (title, description, characters, places, timeline)
+- No spoilers (isCriminal, hidden clues, etc. are excluded)
+
+**Output**:
+- Introduction text (3-7 paragraphs)
+- Sets the scene, introduces incident, presents suspects and locations
+- Explains player's role and objective
+- Ends with a hook to motivate investigation
+
+**Format**: JSON with `{"text": "..."}` field
+
+**Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per game
+
+---
+
+### Phase 3: Runtime Generation (Lazy Loading)
+
+#### LLM 3: Dialogue Generator
 
 **When**: Player questions/interrogates a character
 
@@ -105,7 +129,7 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 
 ---
 
-#### LLM 3: Description Generator
+#### LLM 4: Description Generator
 
 **When**: Player investigates a place or views a character
 
@@ -135,7 +159,7 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 
 ---
 
-#### LLM 4: Action Handler
+#### LLM 5: Action Handler
 
 **When**: Player performs free-form action
 
@@ -165,7 +189,7 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 
 ---
 
-#### LLM 5: Component Updater
+#### LLM 6: Component Updater
 
 **When**: Timeline events trigger or component state needs update
 
@@ -200,18 +224,20 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 
 ### What to Cache
 
-- **Dialogue** (LLM 2): Character conversations
-- **Descriptions** (LLM 3): Place/character descriptions
-- **Action Outcomes** (LLM 4): Common actions (rarely)
-- **Component Updates** (LLM 5): Timeline event outcomes
+- **Intro** (LLM 2): Introduction text (cached per game)
+- **Dialogue** (LLM 3): Character conversations
+- **Descriptions** (LLM 4): Place/character descriptions
+- **Action Outcomes** (LLM 5): Common actions (rarely)
+- **Component Updates** (LLM 6): Timeline event outcomes
 
 ### Cache Key Structure
 
 ```
-LLM 2: "dialogue:{character_id}:{clues_hash}:{time}:{topic}"
-LLM 3: "desc:{place_id}:{time}:{clues_hash}:{events_hash}"
-LLM 4: "action:{action_hash}:{state_hash}"
-LLM 5: "update:{event_id}:{state_hash}"
+LLM 2: "intro:{game_state_hash}" (cached per game)
+LLM 3: "dialogue:{character_id}:{clues_hash}:{time}:{topic}"
+LLM 4: "desc:{place_id}:{time}:{clues_hash}:{events_hash}"
+LLM 5: "action:{action_hash}:{state_hash}"
+LLM 6: "update:{event_id}:{state_hash}"
 ```
 
 ### Cache Storage
@@ -242,7 +268,8 @@ LLM 5: "update:{event_id}:{state_hash}"
 **Recommended: Upstage API (Solar LLM family)**
 
 - **LLM 1 (Initializer)**: Use larger model (Solar Pro) for complete structure generation
-- **LLM 2-5 (Runtime)**: Use faster/cheaper model (Solar Plus) for runtime generation
+- **LLM 2 (Intro Generator)**: Use larger model (Solar Pro) for quality intro text
+- **LLM 3-6 (Runtime)**: Use faster/cheaper model (Solar Plus) for runtime generation
 - **Consistency**: Using same model family helps maintain consistency
 
 **Alternatives**: OpenAI GPT-3.5-turbo/GPT-4, Anthropic Claude (fallback)
@@ -254,22 +281,27 @@ LLM 5: "update:{event_id}:{state_hash}"
 - **Format**: JSON schema or function calling
 - **Key**: Avoid generic responses, ensure all fields populated
 
-#### LLM 2: Dialogue Generator
+#### LLM 2: Intro Generator
+- **Focus**: Compelling narrative, spoiler-free, sets the scene
+- **Format**: JSON with intro text
+- **Key**: No spoilers, equal treatment of suspects, engaging hook
+
+#### LLM 3: Dialogue Generator
 - **Focus**: Personality consistency, context awareness, natural flow
 - **Format**: JSON with dialogue and extracted clues
 - **Key**: Maintain character voice, respond to player's clues
 
-#### LLM 3: Description Generator
+#### LLM 4: Description Generator
 - **Focus**: Visual detail, contextual relevance, atmosphere
 - **Format**: JSON with description and found clues
 - **Key**: Reflect time, events, and player's knowledge
 
-#### LLM 4: Action Handler
+#### LLM 5: Action Handler
 - **Focus**: Validation logic, game state awareness, creative outcomes
 - **Format**: JSON with validation, outcome, state changes
 - **Key**: Balance flexibility with game integrity
 
-#### LLM 5: Component Updater
+#### LLM 6: Component Updater
 - **Focus**: State consistency, narrative coherence, logical updates
 - **Format**: JSON with updated components and narrative
 - **Key**: Maintain game logic, reflect timeline events
@@ -305,7 +337,10 @@ LLM 5: "update:{event_id}:{state_hash}"
 **Initial Generation (LLM 1)**:
 - ~20k tokens = ~$0.20-0.40
 
-**Runtime Generation (LLM 2-5)**:
+**Intro Generation (LLM 2)**:
+- ~2k tokens = ~$0.01-0.02 per game
+
+**Runtime Generation (LLM 3-6)**:
 - ~30-50 calls × ~2k tokens each = ~$0.30-1.00
 - Caching reduces actual calls by ~30-50%
 
@@ -351,7 +386,7 @@ LLM 5: "update:{event_id}:{state_hash}"
 │  └──────────────────────────────────────────┘  │
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
-│  │ LLM 4: Action Handler                    │  │
+│  │ LLM 5: Action Handler                    │  │
 │  │ - Called when player performs free action│  │
 │  │ - Input: action description, game state,  │  │
 │  │          current location, player tools   │  │
@@ -361,7 +396,7 @@ LLM 5: "update:{event_id}:{state_hash}"
 │  └──────────────────────────────────────────┘  │
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
-│  │ LLM 5: Component Updater                 │  │
+│  │ LLM 6: Component Updater                 │  │
 │  │ - Check cache first                       │  │
 │  │ - Called when timeline event triggers    │  │
 │  │ - Input: timeline event, current state   │  │

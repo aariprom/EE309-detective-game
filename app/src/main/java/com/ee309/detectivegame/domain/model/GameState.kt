@@ -1,5 +1,6 @@
 package com.ee309.detectivegame.domain.model
 
+import com.ee309.detectivegame.llm.model.toTimeInfo
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
 
@@ -19,7 +20,11 @@ data class GameState(
     val characters: List<Character> = emptyList(),
     val places: List<Place> = emptyList(),
     val clues: List<Clue> = emptyList(),
-    val timeline: Timeline = Timeline(GameTime(0), GameTime(480)), // 8 hours default
+    val timeline: Timeline = Timeline(
+        baseTime = GameTime(960),   // 16:00 (4 PM) - earliest point in timeline
+        startTime = GameTime(1080), // 18:00 (6 PM) - absolute time when game starts
+        endTime = GameTime(1440)    // 24:00 (midnight) - absolute time when game ends
+    ),
     val flags: Map<String, Boolean> = emptyMap()
 ) {
     /**
@@ -274,12 +279,13 @@ data class GameState(
     
     /**
      * Checks if the time limit has been exceeded.
-     * The time limit is defined by the timeline's endTime.
+     * The time limit is defined by the timeline's endTime (absolute time).
      * 
-     * @return true if currentTime is after or equal to timeline endTime, false otherwise.
+     * @return true if currentTime (converted to absolute) is after or equal to timeline endTime, false otherwise.
      */
     fun isTimeLimitExceeded(): Boolean {
-        return currentTime.minutes >= timeline.endTime.minutes
+        val currentAbsolute = timeline.startTime.minutes + currentTime.minutes
+        return currentAbsolute >= timeline.endTime.minutes
     }
     
     /**
@@ -324,7 +330,9 @@ data class GameState(
      * @return A list of TimelineEvent objects scheduled for the current time. Returns empty list if no events occur at this time.
      */
     fun getTimelineEventsAtCurrentTime(): List<TimelineEvent> {
-        return timeline.getEventsAtTime(currentTime)
+        // currentTime is relative to startTime, convert to absolute
+        val absoluteTime = timeline.startTime.minutes + currentTime.minutes
+        return timeline.getEventsAtTime(GameTime(absoluteTime))
     }
     
     /**
@@ -385,13 +393,17 @@ data class GameState(
      */
     fun advanceTime(minutes: Int): GameState {
         val newTime = currentTime.addMinutes(minutes)
-        // Ensure time doesn't exceed timeline end time
-        val finalTime = if (newTime.minutes > timeline.endTime.minutes) {
-            timeline.endTime
+        // currentTime is relative to startTime (starts at 0)
+        // endTime is absolute, so convert currentTime to absolute for comparison
+        val currentAbsolute = timeline.startTime.minutes + newTime.minutes
+        val finalAbsolute = if (currentAbsolute > timeline.endTime.minutes) {
+            timeline.endTime.minutes
         } else {
-            newTime
+            currentAbsolute
         }
-        return copy(currentTime = finalTime)
+        // Convert back to relative time
+        val finalRelative = finalAbsolute - timeline.startTime.minutes
+        return copy(currentTime = GameTime(finalRelative))
     }
     
     /**
@@ -419,8 +431,13 @@ data class GameState(
     fun getTriggeredEventsBetween(oldTime: GameTime, newTime: GameTime): List<TimelineEvent> {
         return timeline.events.filter { event ->
             val eventMinutes = event.time.minutes
-            // Include events that occur at or after oldTime, but before newTime
-            eventMinutes >= oldTime.minutes && eventMinutes < newTime.minutes
+            // Events are stored as absolute time
+            // oldTime and newTime are relative to startTime
+            // Convert to absolute: startTime + relativeTime
+            val oldAbsolute = timeline.startTime.minutes + oldTime.minutes
+            val newAbsolute = timeline.startTime.minutes + newTime.minutes
+            // Include events that occur at or after oldAbsolute, but before newAbsolute
+            eventMinutes >= oldAbsolute && eventMinutes < newAbsolute
         }.sortedBy { it.time.minutes }
     }
     
@@ -433,12 +450,17 @@ data class GameState(
      */
     fun getEventsForTimeAdvance(minutes: Int): List<TimelineEvent> {
         val newTime = currentTime.addMinutes(minutes)
-        val finalTime = if (newTime.minutes > timeline.endTime.minutes) {
-            timeline.endTime
+        // Convert to absolute for comparison with endTime
+        val currentAbsolute = timeline.startTime.minutes + currentTime.minutes
+        val newAbsolute = timeline.startTime.minutes + newTime.minutes
+        val finalAbsolute = if (newAbsolute > timeline.endTime.minutes) {
+            timeline.endTime.minutes
         } else {
-            newTime
+            newAbsolute
         }
-        return getTriggeredEventsBetween(currentTime, finalTime)
+        // Convert back to relative
+        val finalRelative = finalAbsolute - timeline.startTime.minutes
+        return getTriggeredEventsBetween(currentTime, GameTime(finalRelative))
     }
     
     /**
@@ -519,6 +541,9 @@ data class GameState(
             TimelineEvent.EventType.PLACE_CHANGE -> {
                 processPlaceChange(event)
             }
+            TimelineEvent.EventType.CRIME -> {
+                processCrimeEvent(event)
+            }
             TimelineEvent.EventType.CUSTOM -> {
                 processCustomEvent(event)
             }
@@ -556,6 +581,19 @@ data class GameState(
     }
     
     /**
+     * Processes a crime event.
+     * Crime events occur before the game starts and set flags indicating the crime has occurred.
+     * 
+     * @param event The crime event.
+     * @return Updated GameState with crime event flags set.
+     */
+    private fun processCrimeEvent(event: TimelineEvent): GameState {
+        // Set flag for crime event
+        val flagKey = "crime_event_${event.id}"
+        return updateFlag(flagKey, true)
+    }
+    
+    /**
      * Processes a custom event.
      * Sets generic flags for custom events.
      * 
@@ -586,7 +624,8 @@ data class GameState(
      * @return A GameTime object representing the remaining time. Returns GameTime(0) if time limit has been exceeded.
      */
     fun getRemainingTime(): GameTime {
-        val remaining = timeline.endTime.minutes - currentTime.minutes
+        val currentAbsolute = timeline.startTime.minutes + currentTime.minutes
+        val remaining = timeline.endTime.minutes - currentAbsolute
         return GameTime(maxOf(0, remaining))
     }
     
@@ -596,10 +635,66 @@ data class GameState(
      * @return A value between 0.0 and 1.0 representing the percentage of time elapsed. Returns 1.0 if time limit exceeded.
      */
     fun getTimeProgress(): Double {
+        // startTime and endTime are absolute times
         val totalDuration = timeline.endTime.minutes - timeline.startTime.minutes
         if (totalDuration <= 0) return 1.0
-        val elapsed = currentTime.minutes - timeline.startTime.minutes
+        // currentTime is relative to startTime, so elapsed = currentTime
+        val elapsed = currentTime.minutes
         return (elapsed.toDouble() / totalDuration).coerceIn(0.0, 1.0)
+    }
+    
+    /**
+     * Gets the absolute time (startTime + currentTime).
+     * Useful for display and comparing with event times.
+     * 
+     * @return A GameTime representing the absolute time.
+     */
+    fun getAbsoluteTime(): GameTime {
+        return GameTime(timeline.startTime.minutes + currentTime.minutes)
+    }
+    
+    /**
+     * Extracts public information from GameState for LLM 2 (Intro Generator).
+     * Excludes spoilers like isCriminal, hidden characters, etc.
+     * 
+     * @return IntroRequest containing only public information
+     */
+    fun toIntroRequest(): com.ee309.detectivegame.llm.model.IntroRequest {
+        // Filter out hidden characters and extract only public info
+        val publicCharacters = characters
+            .filter { !it.hidden }
+            .map { character ->
+                com.ee309.detectivegame.llm.model.PublicCharacterInfo(
+                    name = character.name,
+                    traits = character.traits,
+                    currentLocation = character.currentLocation
+                )
+            }
+        
+        // Extract public place info
+        val publicPlaces = places
+            .filter { !it.hidden }
+            .map { place ->
+                com.ee309.detectivegame.llm.model.PublicPlaceInfo(
+                    name = place.name,
+                    description = place.description
+                )
+            }
+        
+        // Extract timeline info
+        val publicTimeline = com.ee309.detectivegame.llm.model.PublicTimelineInfo(
+            baseTime = timeline.baseTime.toTimeInfo(),
+            startTime = timeline.startTime.toTimeInfo(),
+            endTime = timeline.endTime.toTimeInfo()
+        )
+        
+        return com.ee309.detectivegame.llm.model.IntroRequest(
+            title = title,
+            description = description,
+            characters = publicCharacters,
+            places = publicPlaces,
+            timeline = publicTimeline
+        )
     }
     
     /**
