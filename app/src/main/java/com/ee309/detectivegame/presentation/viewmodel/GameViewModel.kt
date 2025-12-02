@@ -52,12 +52,12 @@ class GameViewModel @Inject constructor(
                 )
                 
                 // Process the LLM response: parse, validate, and convert to GameState
-                val result = LLMResponseProcessor.processGameInitializerResponse(rawResponse)
+                val result = LLMResponseProcessor.GameInitializer.process(rawResponse)
                 
                 when (result) {
                     is LLMResponseProcessor.ProcessingResult.Success -> {
-                        _gameState.value = result.gameState
-                        _uiState.value = GameUiState.Success(result.gameState)
+                        _gameState.value = result.data
+                        _uiState.value = GameUiState.Success(result.data)
                     }
                     is LLMResponseProcessor.ProcessingResult.Failure -> {
                         _uiState.value = GameUiState.Error(

@@ -4,64 +4,58 @@ import com.ee309.detectivegame.domain.model.GamePhase
 import com.ee309.detectivegame.domain.model.GameState
 import com.ee309.detectivegame.llm.model.LLMResponse
 import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Processor for LLM responses with JSON parsing, validation, and error handling.
  * Follows the pattern of other LLM config files (LLMPrompt, LLMSchema, LLMTask).
+ * 
+ * Uses a hybrid approach with:
+ * - Common utilities for JSON parsing
+ * - Generic ProcessingResult for type safety
+ * - Task-specific processors as nested objects
  */
 object LLMResponseProcessor {
     
+    /**
+     * Shared JSON instance with common configuration
+     */
     private val json = Json {
         ignoreUnknownKeys = true
     }
     
     /**
-     * Sealed class representing validation errors
+     * Common validation errors shared across all LLM tasks
      */
     sealed class ValidationError(open val message: String) {
         data class EmptyResponse(override val message: String = "LLM returned empty response") : ValidationError(message)
         data class JsonParseError(override val message: String) : ValidationError(message)
-        data class NoCharacters(override val message: String = "No characters found in game data") : ValidationError(message)
-        data class NoPlaces(override val message: String = "No places found in game data") : ValidationError(message)
-        data class InvalidPhase(override val message: String) : ValidationError(message)
-        data class InvalidCharacterLocation(
-            val characterId: String,
-            val locationId: String,
-            override val message: String = "Character '$characterId' has invalid location '$locationId'"
-        ) : ValidationError(message)
-        data class InvalidPlayerLocation(
-            val locationId: String,
-            override val message: String = "Player has invalid starting location '$locationId'"
-        ) : ValidationError(message)
-        data class NoCriminal(override val message: String = "No criminal found in game data") : ValidationError(message)
-        data class MultipleCriminals(override val message: String = "Multiple criminals found in game data") : ValidationError(message)
-        data class InvalidTimeline(
-            override val message: String = "Timeline is invalid: startTime must be before endTime"
-        ) : ValidationError(message)
-        data class InvalidClueReference(
-            val clueId: String,
-            val locationId: String,
-            override val message: String = "Clue '$clueId' references invalid location '$locationId'"
-        ) : ValidationError(message)
     }
     
     /**
-     * Result of processing an LLM response
+     * Generic result type for processing LLM responses.
+     * 
+     * @param T The type of data returned on success
      */
-    sealed class ProcessingResult {
-        data class Success(val gameState: GameState) : ProcessingResult()
-        data class Failure(val error: ValidationError) : ProcessingResult()
+    sealed class ProcessingResult<out T> {
+        data class Success<T>(val data: T) : ProcessingResult<T>()
+        data class Failure(val error: ValidationError) : ProcessingResult<Nothing>()
     }
     
     /**
-     * Parses the raw LLM response string into an LLMResponse object.
+     * Generic JSON parsing utility that works with any serializable type.
      * 
      * @param rawResponse The raw JSON string from the LLM
-     * @return Result containing LLMResponse on success, or ValidationError on failure
+     * @param serializer The serializer for type T (KSerializer works for both serialization and deserialization)
+     * @return Result containing parsed object on success, or exception on failure
      */
     @OptIn(InternalSerializationApi::class)
-    fun parseGameInitializerResponse(rawResponse: String): Result<LLMResponse> {
+    fun <T> parseJson(
+        rawResponse: String,
+        serializer: KSerializer<T>
+    ): Result<T> {
         // Check for empty response
         if (rawResponse.isBlank()) {
             return Result.failure(Exception(ValidationError.EmptyResponse().message))
@@ -69,7 +63,7 @@ object LLMResponseProcessor {
         
         // Parse JSON
         return try {
-            val response = json.decodeFromString<LLMResponse>(rawResponse)
+            val response = json.decodeFromString(serializer, rawResponse)
             Result.success(response)
         } catch (e: Exception) {
             Result.failure(Exception(ValidationError.JsonParseError("JSON parsing failed: ${e.message}").message))
@@ -77,109 +71,239 @@ object LLMResponseProcessor {
     }
     
     /**
-     * Validates a GameState to ensure it meets all requirements.
-     * 
-     * @param gameState The GameState to validate
-     * @return List of validation errors (empty if valid)
+     * Processor for LLM 1: GameInitializer
+     * Handles parsing and validation of game initialization responses.
      */
-    @OptIn(InternalSerializationApi::class)
-    fun validateGameState(gameState: GameState): List<ValidationError> {
-        val errors = mutableListOf<ValidationError>()
+    object GameInitializer {
         
-        // Check for non-empty characters
-        if (gameState.characters.isEmpty()) {
-            errors.add(ValidationError.NoCharacters())
+        /**
+         * GameInitializer-specific validation errors
+         */
+        sealed class ValidationError(override val message: String) : LLMResponseProcessor.ValidationError(message) {
+            data class NoCharacters(override val message: String = "No characters found in game data") : ValidationError(message)
+            data class NoPlaces(override val message: String = "No places found in game data") : ValidationError(message)
+            data class InvalidPhase(override val message: String) : ValidationError(message)
+            data class InvalidCharacterLocation(
+                val characterId: String,
+                val locationId: String,
+                override val message: String = "Character '$characterId' has invalid location '$locationId'"
+            ) : ValidationError(message)
+            data class InvalidPlayerLocation(
+                val locationId: String,
+                override val message: String = "Player has invalid starting location '$locationId'"
+            ) : ValidationError(message)
+            data class NoCriminal(override val message: String = "No criminal found in game data") : ValidationError(message)
+            data class MultipleCriminals(override val message: String = "Multiple criminals found in game data") : ValidationError(message)
+            data class InvalidTimeline(
+                override val message: String = "Timeline is invalid: startTime must be before endTime"
+            ) : ValidationError(message)
+            data class InvalidClueReference(
+                val clueId: String,
+                val locationId: String,
+                override val message: String = "Clue '$clueId' references invalid location '$locationId'"
+            ) : ValidationError(message)
         }
         
-        // Check for non-empty places
-        if (gameState.places.isEmpty()) {
-            errors.add(ValidationError.NoPlaces())
+        /**
+         * Parses the raw LLM response string into an LLMResponse object.
+         * 
+         * @param rawResponse The raw JSON string from the LLM
+         * @return Result containing LLMResponse on success, or exception on failure
+         */
+        @OptIn(InternalSerializationApi::class)
+        fun parse(rawResponse: String): Result<LLMResponse> {
+            return parseJson(rawResponse, LLMResponse.serializer())
         }
         
-        // If we don't have places, skip location validation
-        if (gameState.places.isNotEmpty()) {
-            val placeIds = gameState.places.map { it.id }.toSet()
+        /**
+         * Validates a GameState to ensure it meets all requirements.
+         * 
+         * @param gameState The GameState to validate
+         * @return List of validation errors (empty if valid)
+         */
+        @OptIn(InternalSerializationApi::class)
+        fun validate(gameState: GameState): List<ValidationError> {
+            val errors = mutableListOf<ValidationError>()
             
-            // Validate character locations
-            gameState.characters.forEach { character ->
-                if (!placeIds.contains(character.currentLocation)) {
-                    errors.add(ValidationError.InvalidCharacterLocation(character.id, character.currentLocation))
+            // Check for non-empty characters
+            if (gameState.characters.isEmpty()) {
+                errors.add(ValidationError.NoCharacters())
+            }
+            
+            // Check for non-empty places
+            if (gameState.places.isEmpty()) {
+                errors.add(ValidationError.NoPlaces())
+            }
+            
+            // If we don't have places, skip location validation
+            if (gameState.places.isNotEmpty()) {
+                val placeIds = gameState.places.map { it.id }.toSet()
+                
+                // Validate character locations
+                gameState.characters.forEach { character ->
+                    if (!placeIds.contains(character.currentLocation)) {
+                        errors.add(ValidationError.InvalidCharacterLocation(character.id, character.currentLocation))
+                    }
+                }
+                
+                // Validate player location
+                if (!placeIds.contains(gameState.player.currentLocation)) {
+                    errors.add(ValidationError.InvalidPlayerLocation(gameState.player.currentLocation))
+                }
+                
+                // Validate clue locations (can be place IDs or character IDs)
+                val characterIds = gameState.characters.map { it.id }.toSet()
+                gameState.clues.forEach { clue ->
+                    val isValidLocation = placeIds.contains(clue.location) || characterIds.contains(clue.location)
+                    if (!isValidLocation) {
+                        errors.add(ValidationError.InvalidClueReference(clue.id, clue.location))
+                    }
                 }
             }
             
-            // Validate player location
-            if (!placeIds.contains(gameState.player.currentLocation)) {
-                errors.add(ValidationError.InvalidPlayerLocation(gameState.player.currentLocation))
+            // Validate phase (should be INTRODUCTION for initial game state)
+            val validInitialPhases = listOf(GamePhase.START, GamePhase.TUTORIAL, GamePhase.INTRODUCTION)
+            if (!validInitialPhases.contains(gameState.phase)) {
+                errors.add(ValidationError.InvalidPhase(
+                    "Phase should be one of ${validInitialPhases.joinToString()}, but got ${gameState.phase}"
+                ))
             }
             
-            // Validate clue locations (can be place IDs or character IDs)
-            val characterIds = gameState.characters.map { it.id }.toSet()
-            gameState.clues.forEach { clue ->
-                val isValidLocation = placeIds.contains(clue.location) || characterIds.contains(clue.location)
-                if (!isValidLocation) {
-                    errors.add(ValidationError.InvalidClueReference(clue.id, clue.location))
-                }
+            // Validate exactly one criminal exists
+            val criminals = gameState.characters.filter { it.isCriminal }
+            when {
+                criminals.isEmpty() -> errors.add(ValidationError.NoCriminal())
+                criminals.size > 1 -> errors.add(ValidationError.MultipleCriminals(
+                    "Found ${criminals.size} criminals: ${criminals.joinToString { it.id }}"
+                ))
             }
+            
+            // Validate timeline
+            if (gameState.timeline.startTime.minutes >= gameState.timeline.endTime.minutes) {
+                errors.add(ValidationError.InvalidTimeline())
+            }
+            
+            return errors
         }
         
-        // Validate phase (should be INTRODUCTION for initial game state)
-        val validInitialPhases = listOf(GamePhase.START, GamePhase.TUTORIAL, GamePhase.INTRODUCTION)
-        if (!validInitialPhases.contains(gameState.phase)) {
-            errors.add(ValidationError.InvalidPhase(
-                "Phase should be one of ${validInitialPhases.joinToString()}, but got ${gameState.phase}"
-            ))
+        /**
+         * Processes a raw LLM response: parses JSON, converts to GameState, and validates.
+         * 
+         * @param rawResponse The raw JSON string from the LLM
+         * @return ProcessingResult with GameState on success, or ValidationError on failure
+         */
+        @OptIn(InternalSerializationApi::class)
+        fun process(rawResponse: String): ProcessingResult<GameState> {
+            // Parse JSON
+            val parseResult = parse(rawResponse)
+            val llmResponse = parseResult.getOrElse { exception ->
+                return ProcessingResult.Failure(
+                    LLMResponseProcessor.ValidationError.JsonParseError(exception.message ?: "Unknown parsing error")
+                )
+            }
+            
+            // Convert to GameState
+            val gameState = try {
+                llmResponse.toGameState()
+            } catch (e: Exception) {
+                return ProcessingResult.Failure(
+                    LLMResponseProcessor.ValidationError.JsonParseError("Failed to convert LLMResponse to GameState: ${e.message}")
+                )
+            }
+            
+            // Validate GameState
+            val validationErrors = validate(gameState)
+            if (validationErrors.isNotEmpty()) {
+                // Return the first error (or combine them if needed)
+                return ProcessingResult.Failure(validationErrors.first())
+            }
+            
+            return ProcessingResult.Success(gameState)
         }
-        
-        // Validate exactly one criminal exists
-        val criminals = gameState.characters.filter { it.isCriminal }
-        when {
-            criminals.isEmpty() -> errors.add(ValidationError.NoCriminal())
-            criminals.size > 1 -> errors.add(ValidationError.MultipleCriminals(
-                "Found ${criminals.size} criminals: ${criminals.joinToString { it.id }}"
-            ))
-        }
-        
-        // Validate timeline
-        if (gameState.timeline.startTime.minutes >= gameState.timeline.endTime.minutes) {
-            errors.add(ValidationError.InvalidTimeline())
-        }
-        
-        return errors
     }
     
     /**
-     * Processes a raw LLM response: parses JSON, converts to GameState, and validates.
-     * 
-     * @param rawResponse The raw JSON string from the LLM
-     * @return ProcessingResult with GameState on success, or ValidationError on failure
+     * Processor for LLM 2: IntroGenerator
+     * Handles parsing and validation of intro text responses.
      */
-    @OptIn(InternalSerializationApi::class)
-    fun processGameInitializerResponse(rawResponse: String): ProcessingResult {
-        // Parse JSON
-        val parseResult = parseGameInitializerResponse(rawResponse)
-        val llmResponse = parseResult.getOrElse { exception ->
-            return ProcessingResult.Failure(
-                ValidationError.JsonParseError(exception.message ?: "Unknown parsing error")
-            )
+    object IntroGenerator {
+        
+        /**
+         * IntroGenerator-specific validation errors
+         */
+        sealed class ValidationError(override val message: String) : LLMResponseProcessor.ValidationError(message) {
+            data class EmptyText(override val message: String = "Intro text is empty") : ValidationError(message)
+            data class TextTooShort(
+                val length: Int,
+                override val message: String = "Intro text is too short (minimum 50 characters, got $length)"
+            ) : ValidationError(message)
+            data class TextTooLong(
+                val length: Int,
+                override val message: String = "Intro text is too long (maximum 2000 characters, got $length)"
+            ) : ValidationError(message)
         }
         
-        // Convert to GameState
-        val gameState = try {
-            llmResponse.toGameState()
-        } catch (e: Exception) {
-            return ProcessingResult.Failure(
-                ValidationError.JsonParseError("Failed to convert LLMResponse to GameState: ${e.message}")
-            )
+        /**
+         * Processes a raw LLM response for intro text.
+         * IntroGenerator may return plain text or JSON with a "text" field.
+         * 
+         * @param rawResponse The raw response string from the LLM
+         * @return ProcessingResult with intro text on success, or ValidationError on failure
+         */
+        fun process(rawResponse: String): ProcessingResult<String> {
+            // Check for empty response
+            if (rawResponse.isBlank()) {
+                return ProcessingResult.Failure(
+                    LLMResponseProcessor.ValidationError.EmptyResponse()
+                )
+            }
+            
+            // Try to parse as JSON first (in case LLM returns JSON with "text" field)
+            val introText = try {
+                val json = Json { ignoreUnknownKeys = true }
+                val jsonElement = json.parseToJsonElement(rawResponse)
+                if (jsonElement is JsonObject && jsonElement.containsKey("text")) {
+                    jsonElement["text"]?.toString()?.trim('"') ?: rawResponse.trim()
+                } else {
+                    rawResponse.trim()
+                }
+            } catch (e: Exception) {
+                // If not JSON, treat as plain text
+                println("Failed to parse as JSON: ${e.message}")
+                rawResponse.trim()
+            }
+            
+            // Validate intro text
+            val validationErrors = validate(introText)
+            if (validationErrors.isNotEmpty()) {
+                return ProcessingResult.Failure(validationErrors.first())
+            }
+            
+            return ProcessingResult.Success(introText)
         }
         
-        // Validate GameState
-        val validationErrors = validateGameState(gameState)
-        if (validationErrors.isNotEmpty()) {
-            // Return the first error (or combine them if needed)
-            return ProcessingResult.Failure(validationErrors.first())
+        /**
+         * Validates intro text to ensure it meets requirements.
+         * 
+         * @param introText The intro text to validate
+         * @return List of validation errors (empty if valid)
+         */
+        fun validate(introText: String): List<ValidationError> {
+            val errors = mutableListOf<ValidationError>()
+            
+            if (introText.isBlank()) {
+                errors.add(ValidationError.EmptyText())
+            }
+            
+            if (introText.length < 50) {
+                errors.add(ValidationError.TextTooShort(introText.length))
+            }
+            
+            if (introText.length > 2000) {
+                errors.add(ValidationError.TextTooLong(introText.length))
+            }
+            
+            return errors
         }
-        
-        return ProcessingResult.Success(gameState)
     }
 }
-
