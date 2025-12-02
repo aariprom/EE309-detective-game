@@ -174,8 +174,14 @@ object LLMPrompt {
             ------------------------------
             [OUTPUT]
             
-            Return ONLY the final intro text to show to the player.
-            Do not wrap it in JSON. Do not add explanations.
+            Return a JSON object with a single "text" field containing the intro text.
+            The JSON must strictly follow the schema provided via `response_format.json_schema`.
+            Do NOT return natural language explanation, markdown, or comments. Return ONLY a single JSON object.
+            
+            Example format:
+            {
+              "text": "Your intro text here..."
+            }
 
         """
     }

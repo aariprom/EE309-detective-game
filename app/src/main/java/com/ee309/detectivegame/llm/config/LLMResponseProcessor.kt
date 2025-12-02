@@ -3,6 +3,7 @@ package com.ee309.detectivegame.llm.config
 import com.ee309.detectivegame.domain.model.GamePhase
 import com.ee309.detectivegame.domain.model.GameState
 import com.ee309.detectivegame.llm.model.LLMResponse
+import com.ee309.detectivegame.llm.model.IntroResponse
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -112,7 +113,7 @@ object LLMResponseProcessor {
          */
         @OptIn(InternalSerializationApi::class)
         fun parse(rawResponse: String): Result<LLMResponse> {
-            return parseJson(rawResponse, LLMResponse.serializer())
+            return LLMResponseProcessor.parseJson(rawResponse, LLMResponse.serializer())
         }
         
         /**
@@ -245,11 +246,12 @@ object LLMResponseProcessor {
         
         /**
          * Processes a raw LLM response for intro text.
-         * IntroGenerator may return plain text or JSON with a "text" field.
+         * IntroGenerator returns JSON with a "text" field according to the schema.
          * 
          * @param rawResponse The raw response string from the LLM
          * @return ProcessingResult with intro text on success, or ValidationError on failure
          */
+        @OptIn(InternalSerializationApi::class)
         fun process(rawResponse: String): ProcessingResult<String> {
             // Check for empty response
             if (rawResponse.isBlank()) {
@@ -258,20 +260,22 @@ object LLMResponseProcessor {
                 )
             }
             
-            // Try to parse as JSON first (in case LLM returns JSON with "text" field)
-            val introText = try {
-                val json = Json { ignoreUnknownKeys = true }
-                val jsonElement = json.parseToJsonElement(rawResponse)
-                if (jsonElement is JsonObject && jsonElement.containsKey("text")) {
-                    jsonElement["text"]?.toString()?.trim('"') ?: rawResponse.trim()
-                } else {
-                    rawResponse.trim()
+            // Parse JSON response
+            val parseResult = LLMResponseProcessor.parseJson(rawResponse, IntroResponse.serializer())
+            val introResponse = parseResult.getOrElse { exception ->
+                // If JSON parsing fails, try to treat as plain text (fallback)
+                val fallbackText = rawResponse.trim()
+                val validationErrors = validate(fallbackText)
+                if (validationErrors.isEmpty()) {
+                    return ProcessingResult.Success(fallbackText)
                 }
-            } catch (e: Exception) {
-                // If not JSON, treat as plain text
-                println("Failed to parse as JSON: ${e.message}")
-                rawResponse.trim()
+                return ProcessingResult.Failure(
+                    LLMResponseProcessor.ValidationError.JsonParseError(exception.message ?: "Unknown parsing error")
+                )
             }
+            
+            // Extract text from response
+            val introText = introResponse.text.trim()
             
             // Validate intro text
             val validationErrors = validate(introText)

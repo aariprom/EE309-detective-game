@@ -1,5 +1,6 @@
 package com.ee309.detectivegame.domain.model
 
+import com.ee309.detectivegame.llm.model.toTimeInfo
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
 
@@ -600,6 +601,49 @@ data class GameState(
         if (totalDuration <= 0) return 1.0
         val elapsed = currentTime.minutes - timeline.startTime.minutes
         return (elapsed.toDouble() / totalDuration).coerceIn(0.0, 1.0)
+    }
+    
+    /**
+     * Extracts public information from GameState for LLM 2 (Intro Generator).
+     * Excludes spoilers like isCriminal, hidden characters, etc.
+     * 
+     * @return IntroRequest containing only public information
+     */
+    fun toIntroRequest(): com.ee309.detectivegame.llm.model.IntroRequest {
+        // Filter out hidden characters and extract only public info
+        val publicCharacters = characters
+            .filter { !it.hidden }
+            .map { character ->
+                com.ee309.detectivegame.llm.model.PublicCharacterInfo(
+                    name = character.name,
+                    traits = character.traits,
+                    currentLocation = character.currentLocation
+                )
+            }
+        
+        // Extract public place info
+        val publicPlaces = places
+            .filter { !it.hidden }
+            .map { place ->
+                com.ee309.detectivegame.llm.model.PublicPlaceInfo(
+                    name = place.name,
+                    description = place.description
+                )
+            }
+        
+        // Extract timeline info
+        val publicTimeline = com.ee309.detectivegame.llm.model.PublicTimelineInfo(
+            startTime = timeline.startTime.toTimeInfo(),
+            endTime = timeline.endTime.toTimeInfo()
+        )
+        
+        return com.ee309.detectivegame.llm.model.IntroRequest(
+            title = title,
+            description = description,
+            characters = publicCharacters,
+            places = publicPlaces,
+            timeline = publicTimeline
+        )
     }
     
     /**

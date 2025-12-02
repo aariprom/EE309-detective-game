@@ -16,7 +16,7 @@ sealed class LLMTask (
     object IntroGenerator: LLMTask(
         model = "solar-pro2",
         systemPrompt = LLMPrompt.IntroGenerator.SYSTEM_PROMPT,
-        schema = LLMSchema.GameInitializer.SCHEMA
+        schema = LLMSchema.IntroGenerator.SCHEMA
     )
     // Todo: Implement followings
 

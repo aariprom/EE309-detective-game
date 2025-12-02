@@ -26,6 +26,8 @@ fun GameScreen(
     val uiState by viewModel.uiState.collectAsState()
     val gameState by viewModel.gameState.collectAsState()
     val conversationHistory by viewModel.conversationHistory.collectAsState()
+    val introText by viewModel.introText.collectAsState()
+    val introShown by viewModel.introShown.collectAsState()
     
     // Local state for dialogs and conversation
     var showCharacterDialog by remember { mutableStateOf(false) }
@@ -37,6 +39,14 @@ fun GameScreen(
     when {
         gameState == null -> {
             StartScreen(viewModel = viewModel)
+        }
+        
+        // Show IntroScreen if intro text is available and hasn't been shown yet
+        introText != null && !introShown -> {
+            IntroScreen(
+                introText = introText!!,
+                onContinue = { viewModel.onIntroComplete() }
+            )
         }
         
         uiState is GameUiState.Success -> {
