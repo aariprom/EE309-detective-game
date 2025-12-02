@@ -36,6 +36,9 @@ class GameViewModel @Inject constructor(
     private val _conversationHistory = MutableStateFlow<Map<String, List<ConversationMessage>>>(emptyMap())
     val conversationHistory: StateFlow<Map<String, List<ConversationMessage>>> = _conversationHistory.asStateFlow()
     
+    private val _dialogueLoading = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val dialogueLoading: StateFlow<Map<String, Boolean>> = _dialogueLoading.asStateFlow()
+    
     private val _introText = MutableStateFlow<String?>(null)
     val introText: StateFlow<String?> = _introText.asStateFlow()
     
@@ -68,6 +71,12 @@ class GameViewModel @Inject constructor(
                     maxTokens = 10000
                 )
                 
+                // Check for empty response
+                if (gameStateResponse.isBlank()) {
+                    _uiState.value = GameUiState.Error("Received empty response from LLM. Please try again.")
+                    return@launch
+                }
+                
                 // Process the LLM 1 response: parse, validate, and convert to GameState
                 val gameStateResult = LLMResponseProcessor.GameInitializer.process(gameStateResponse)
                 
@@ -98,6 +107,14 @@ class GameViewModel @Inject constructor(
                     userContent = introRequestJson,
                     maxTokens = 2000
                 )
+                
+                // Check for empty response
+                if (introResponse.isBlank()) {
+                    // If intro generation fails, still allow game to start without intro
+                    _introShown.value = true
+                    _uiState.value = GameUiState.Success(gameState)
+                    return@launch
+                }
                 
                 // Process the LLM 2 response: parse and validate intro text
                 val introResult = LLMResponseProcessor.IntroGenerator.process(introResponse)
@@ -254,19 +271,35 @@ class GameViewModel @Inject constructor(
         if (character.currentLocation != state.player.currentLocation) {
             return state
         }
+        
+        // Return early if no question provided (no initial greeting)
+        if (question == null || question.isBlank()) {
+            return state
+        }
 
-        // Get conversation history for this character
+        // Add player's question to conversation history immediately
+        addConversationMessage(characterId, ConversationMessage(question, true))
+
+        // Set loading state
+        _dialogueLoading.value = _dialogueLoading.value + (characterId to true)
+
+        // Get conversation history for this character (includes the question we just added)
         val history = getConversationHistory(characterId)
         
         // Build dialogue request
         val dialogueRequest = try {
             state.toDialogueRequest(
                 characterId = characterId,
-                playerQuestion = question ?: "Hello, can you tell me about what happened?",
+                playerQuestion = question,
                 conversationHistory = history
             )
         } catch (e: Exception) {
-            _uiState.value = GameUiState.Error("Failed to build dialogue request: ${e.message}")
+            _dialogueLoading.value = _dialogueLoading.value + (characterId to false)
+            // Add error message to conversation
+            addConversationMessage(characterId, ConversationMessage(
+                "Error: Failed to build dialogue request. ${e.message ?: "Unknown error"}",
+                false
+            ))
             return state
         }
         
@@ -277,14 +310,37 @@ class GameViewModel @Inject constructor(
         )
         
         // Call LLM 3: Dialogue Generator
-        val dialogueResponse = try {
-            llmRepository.callUpstage(
+        val dialogueResponse: String
+        try {
+            dialogueResponse = llmRepository.callUpstage(
                 task = LLMTask.DialogueGenerator,
                 userContent = requestJson,
                 maxTokens = 2000
             )
         } catch (e: Exception) {
-            _uiState.value = GameUiState.Error("Failed to generate dialogue: ${e.message ?: "Unknown error"}")
+            _dialogueLoading.value = _dialogueLoading.value + (characterId to false)
+            // Add error message to conversation instead of just setting UI state
+            val errorMessage = when {
+                e.message?.contains("timeout", ignoreCase = true) == true -> 
+                    "Error: Request timed out. The character is taking too long to respond. Please try again."
+                e.message?.contains("Network error", ignoreCase = true) == true -> 
+                    "Error: Network connection failed. Please check your internet connection and try again."
+                e.message?.contains("HTTP", ignoreCase = true) == true -> 
+                    "Error: Server error occurred. ${e.message}"
+                else -> 
+                    "Error: Failed to generate dialogue. ${e.message ?: "Unknown error occurred. Please try again."}"
+            }
+            addConversationMessage(characterId, ConversationMessage(errorMessage, false))
+            return state
+        }
+        
+        // Check for empty response
+        if (dialogueResponse.isBlank()) {
+            _dialogueLoading.value = _dialogueLoading.value + (characterId to false)
+            addConversationMessage(characterId, ConversationMessage(
+                "Error: Received empty response from server. Please try again.",
+                false
+            ))
             return state
         }
         
@@ -296,23 +352,18 @@ class GameViewModel @Inject constructor(
                 dialogueResult.data
             }
             is LLMResponseProcessor.ProcessingResult.Failure -> {
-                _uiState.value = GameUiState.Error("Failed to process dialogue: ${dialogueResult.error.message}")
+                _dialogueLoading.value = _dialogueLoading.value + (characterId to false)
+                // Add error message to conversation
+                addConversationMessage(characterId, ConversationMessage(
+                    "Error: Failed to process dialogue response. ${dialogueResult.error.message}",
+                    false
+                ))
                 return state
             }
         }
         
-        // Validate clue IDs if new clues were revealed
-        if (dialogueData.newClues != null && dialogueData.newClues.isNotEmpty()) {
-            val clueValidationErrors = LLMResponseProcessor.DialogueGenerator.validateClueIds(dialogueData, state)
-            if (clueValidationErrors.isNotEmpty()) {
-                // Log warning but continue - invalid clues will be filtered out
-                // Could also return error if strict validation is needed
-            }
-        }
-        
-        // Add player's question to conversation history
-        val playerQuestionText = question ?: "Hello, can you tell me about what happened?"
-        addConversationMessage(characterId, ConversationMessage(playerQuestionText, true))
+        // Clear loading state
+        _dialogueLoading.value = _dialogueLoading.value + (characterId to false)
         
         // Add character's response to conversation history
         addConversationMessage(characterId, ConversationMessage(dialogueData.dialogue, false))
@@ -320,11 +371,41 @@ class GameViewModel @Inject constructor(
         // Update game state
         var newState = state
         
-        // Add new clues to player's collected clues (if valid)
-        val validNewClues = dialogueData.newClues?.filter { clueId ->
-            state.getClue(clueId) != null
-        } ?: emptyList()
+        // Validate and filter new clues if any were revealed
+        val validNewClues = if (dialogueData.newClues != null && dialogueData.newClues.isNotEmpty()) {
+            // Validate all clues
+            val clueValidationErrors = LLMResponseProcessor.DialogueGenerator.validateClueIds(
+                dialogueData,
+                state,
+                characterId
+            )
+            
+            // Log validation errors for debugging (but don't block execution)
+            if (clueValidationErrors.isNotEmpty()) {
+                // Filter out invalid clues based on error types
+                val invalidClueIds = clueValidationErrors.mapNotNull { error ->
+                    when (error) {
+                        is LLMResponseProcessor.DialogueGenerator.ValidationError.InvalidClueId -> error.clueId
+                        is LLMResponseProcessor.DialogueGenerator.ValidationError.ClueNotInCharacterKnowledge -> error.clueId
+                        is LLMResponseProcessor.DialogueGenerator.ValidationError.ClueNotUnlocked -> error.clueId
+                        is LLMResponseProcessor.DialogueGenerator.ValidationError.ClueAlreadyCollected -> error.clueId
+                        else -> null
+                    }
+                }.toSet()
+                
+                // Filter out invalid clues
+                dialogueData.newClues.filter { clueId ->
+                    !invalidClueIds.contains(clueId)
+                }
+            } else {
+                // All clues are valid
+                dialogueData.newClues
+            }
+        } else {
+            emptyList()
+        }
         
+        // Add valid new clues to player's collected clues
         if (validNewClues.isNotEmpty()) {
             val updatedCollectedClues = (state.player.collectedClues + validNewClues).distinct()
             val updatedPlayer = state.player.copy(collectedClues = updatedCollectedClues)

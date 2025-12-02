@@ -367,6 +367,19 @@ object LLMResponseProcessor {
                 val clueId: String,
                 override val message: String = "Invalid clue ID in newClues: $clueId"
             ) : ValidationError(message)
+            data class ClueNotInCharacterKnowledge(
+                val clueId: String,
+                val characterId: String,
+                override val message: String = "Clue $clueId is not in character $characterId's knownClues list"
+            ) : ValidationError(message)
+            data class ClueNotUnlocked(
+                val clueId: String,
+                override val message: String = "Clue $clueId is not unlocked (unlockConditions not met)"
+            ) : ValidationError(message)
+            data class ClueAlreadyCollected(
+                val clueId: String,
+                override val message: String = "Clue $clueId is already in player's collected clues"
+            ) : ValidationError(message)
         }
         
         /**
@@ -428,26 +441,58 @@ object LLMResponseProcessor {
         }
         
         /**
-         * Validates that clue IDs in newClues exist in the game state.
+         * Validates that clue IDs in newClues are valid and can be revealed by the character.
          * This should be called from GameViewModel where GameState is available.
+         * 
+         * Validates:
+         * 1. Clue exists in GameState
+         * 2. Clue is in character's knownClues list
+         * 3. Clue is unlocked (unlockConditions met)
+         * 4. Player doesn't already have the clue
          * 
          * @param dialogueResponse The dialogue response containing newClues
          * @param gameState The current game state to validate against
-         * @return List of validation errors (empty if valid)
+         * @param characterId The ID of the character revealing the clues
+         * @return List of validation errors (empty if all clues are valid)
          */
         @OptIn(InternalSerializationApi::class)
         fun validateClueIds(
             dialogueResponse: com.ee309.detectivegame.llm.model.DialogueResponse,
-            gameState: com.ee309.detectivegame.domain.model.GameState
+            gameState: com.ee309.detectivegame.domain.model.GameState,
+            characterId: String
         ): List<ValidationError> {
             val errors = mutableListOf<ValidationError>()
             
             val newClues = dialogueResponse.newClues ?: return errors
             
+            // Get character to check knownClues
+            val character = gameState.getCharacter(characterId)
+            if (character == null) {
+                // Character not found - this is a critical error, but we'll validate clues anyway
+                // The calling code should handle this separately
+            }
+            
             for (clueId in newClues) {
+                // 1. Check if clue exists in GameState
                 val clue = gameState.getClue(clueId)
                 if (clue == null) {
                     errors.add(ValidationError.InvalidClueId(clueId))
+                    continue  // Skip other validations if clue doesn't exist
+                }
+                
+                // 2. Check if clue is in character's knownClues
+                if (character != null && !character.knownClues.contains(clueId)) {
+                    errors.add(ValidationError.ClueNotInCharacterKnowledge(clueId, characterId))
+                }
+                
+                // 3. Check if clue is unlocked (unlockConditions met)
+                if (!clue.isUnlocked(gameState.flags)) {
+                    errors.add(ValidationError.ClueNotUnlocked(clueId))
+                }
+                
+                // 4. Check if player already has the clue
+                if (gameState.player.collectedClues.contains(clueId)) {
+                    errors.add(ValidationError.ClueAlreadyCollected(clueId))
                 }
             }
             

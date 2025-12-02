@@ -26,6 +26,7 @@ import com.ee309.detectivegame.domain.model.Character
 fun ConversationScreen(
     character: Character,
     messages: List<ConversationMessage>,
+    isLoading: Boolean = false,
     onBack: () -> Unit,
     onSendMessage: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -33,10 +34,11 @@ fun ConversationScreen(
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
     
-    // Auto-scroll to bottom when new messages are added
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    // Auto-scroll to bottom when new messages are added or loading state changes
+    LaunchedEffect(messages.size, isLoading) {
+        val itemCount = messages.size + if (isLoading) 1 else 0
+        if (itemCount > 0) {
+            listState.animateScrollToItem(itemCount - 1)
         }
     }
     
@@ -101,6 +103,13 @@ fun ConversationScreen(
                         isFromPlayer = message.isFromPlayer
                     )
                 }
+                
+                // Show loading indicator when character is generating response
+                if (isLoading) {
+                    item {
+                        ConversationLoadingIndicator()
+                    }
+                }
             }
         }
         
@@ -120,7 +129,7 @@ fun ConversationScreen(
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Type your question...") },
                 singleLine = true,
-                enabled = true
+                enabled = !isLoading
             )
             Button(
                 onClick = {
@@ -129,7 +138,7 @@ fun ConversationScreen(
                         inputText = ""
                     }
                 },
-                enabled = inputText.isNotBlank()
+                enabled = inputText.isNotBlank() && !isLoading
             ) {
                 Text("Send")
             }
@@ -175,6 +184,37 @@ private fun ConversationMessageBubble(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun ConversationLoadingIndicator() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            tonalElevation = 2.dp,
+            modifier = Modifier.widthIn(max = 280.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp
+                )
+                Text(
+                    text = "Character is thinking...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
     }
 }

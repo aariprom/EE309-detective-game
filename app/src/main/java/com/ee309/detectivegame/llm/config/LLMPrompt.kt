@@ -293,8 +293,16 @@ object LLMPrompt {
             
             When appropriate, characters may reveal new clues during conversation:
             
-            1. Only reveal clues that are in the character's `knownClues` list
+            1. **CRITICAL REQUIREMENTS:**
+               - Only reveal clues that are in the character's `knownClues` list
+               - Only reveal clues that are unlocked (their unlockConditions are met)
+               - Do NOT reveal clues the player already has (check `player.collectedClues`)
+               - Clues must exist in the game state
+            
             2. Reveal clues naturally through dialogue, not as a list
+               - The dialogue text should naturally mention or imply the clue
+               - The clue ID should be included in the `newClues` array
+            
             3. Clues should be revealed when:
                - The player asks the right questions
                - The character trusts the player enough
@@ -302,9 +310,13 @@ object LLMPrompt {
                - The character's mental state allows it (e.g., "Helpful" characters may reveal more)
             
             4. Criminal characters may:
-               - Lie about clues
+               - Lie about clues (but still only reveal clues from their knownClues)
                - Redirect suspicion
                - Be evasive or defensive
+            
+            5. **Validation:**
+               - Invalid clues (not in knownClues, not unlocked, already collected) will be filtered out
+               - Only include clue IDs that the character actually knows and can reveal
             
             ------------------------------
             [MENTAL STATE UPDATES]

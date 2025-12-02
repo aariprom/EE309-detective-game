@@ -34,24 +34,45 @@ class LLMRepository @Inject constructor(
             }
         }
 
+        val request = ChatRequest(
+            model = task.model,
+            messages = messages,
+            stream = false,
+            maxTokens = maxTokens,
+            responseFormat = responseFormatJson
+        )
+        println(request)
+        
         try {
-            val request = ChatRequest(
-                model = task.model,
-                messages = messages,
-                stream = false,
-                maxTokens = maxTokens,
-                responseFormat = responseFormatJson
-            )
-            println(request)
             val response = upstageApiService.chatCompletion(request)
-            return response.choices.firstOrNull()?.message?.content ?: ""
+            val content = response.choices.firstOrNull()?.message?.content
+            if (content.isNullOrBlank()) {
+                throw Exception("LLM returned empty response")
+            }
+            return content
         } catch (e: retrofit2.HttpException) {
             val errorBody = e.response()?.errorBody()?.string()
-            println("Http ${e.code()} error: $errorBody")
+            val errorMessage = "HTTP ${e.code()} error: ${errorBody ?: e.message}"
+            println(errorMessage)
+            throw Exception(errorMessage, e)
+        } catch (e: java.net.SocketTimeoutException) {
+            val errorMessage = "Request timeout: The server took too long to respond. Please try again."
+            println(errorMessage)
+            throw Exception(errorMessage, e)
+        } catch (e: java.io.IOException) {
+            val errorMessage = "Network error: ${e.message ?: "Unable to connect to server. Please check your internet connection."}"
+            println(errorMessage)
+            throw Exception(errorMessage, e)
         } catch (e: Exception) {
-            println("Error: ${e.message}")
+            // Re-throw if already wrapped, otherwise wrap it
+            if (e.message != null && e.message!!.startsWith("HTTP") || 
+                e.message != null && e.message!!.startsWith("Request timeout") ||
+                e.message != null && e.message!!.startsWith("Network error")) {
+                throw e
+            }
+            val errorMessage = "LLM API error: ${e.message ?: "Unknown error occurred"}"
+            println(errorMessage)
+            throw Exception(errorMessage, e)
         }
-
-        return ""
     }
 }

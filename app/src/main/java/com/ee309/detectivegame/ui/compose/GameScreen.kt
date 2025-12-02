@@ -26,6 +26,7 @@ fun GameScreen(
     val uiState by viewModel.uiState.collectAsState()
     val gameState by viewModel.gameState.collectAsState()
     val conversationHistory by viewModel.conversationHistory.collectAsState()
+    val dialogueLoading by viewModel.dialogueLoading.collectAsState()
     val introText by viewModel.introText.collectAsState()
     val introShown by viewModel.introShown.collectAsState()
     
@@ -70,13 +71,14 @@ fun GameScreen(
                     conversationCharacterId?.let { charId ->
                         val character = currentGameState.getCharacter(charId)
                         if (character != null) {
+                            val isLoading = viewModel.dialogueLoading.value[charId] ?: false
                             ConversationScreen(
                                 character = character,
                                 messages = conversationHistory[charId] ?: emptyList(),
+                                isLoading = isLoading,
                                 onBack = { conversationCharacterId = null },
                                 onSendMessage = { message ->
-                                    viewModel.addConversationMessage(charId, ConversationMessage(message, true))
-                                    viewModel.addConversationMessage(charId, ConversationMessage("[Character response placeholder]", false))
+                                    viewModel.executeAction(GameAction.Question(charId, message))
                                 }
                             )
                             return
@@ -133,11 +135,7 @@ fun GameScreen(
                                 when (dialogActionType) {
                                     DialogActionType.Question -> {
                                         conversationCharacterId = character.id
-                                        val existingHistory = viewModel.getConversationHistory(character.id)
-                                        if (existingHistory.isEmpty()) {
-                                            viewModel.addConversationMessage(character.id, ConversationMessage("You start questioning ${character.name}...", false))
-                                        }
-                                        viewModel.executeAction(GameAction.Question(character.id))
+                                        // No initial greeting - user must send a message to start conversation
                                     }
                                     DialogActionType.Accuse -> {
                                         viewModel.executeAction(GameAction.Accuse(character.id))
