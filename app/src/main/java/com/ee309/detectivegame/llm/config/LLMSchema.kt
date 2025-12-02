@@ -275,9 +275,27 @@ object LLMSchema {
     }
 
     // Todo: Implement followings
-    // LLM 2: Dialogue Generator
-    // LLM 3: Description Generator
-    // LLM 4: Action Handler
-    // LLM 5: Component Updater
+    // LLM 2: Intro Generator
+    object IntroGenerator {
+        val SCHEMA = """
+            {
+              "name": "intro",
+              "strict": true,
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "The intro text to show to the player."
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        // LLM 3: Dialogue Generator
+        // LLM 4: Description Generator
+    }
 }
 

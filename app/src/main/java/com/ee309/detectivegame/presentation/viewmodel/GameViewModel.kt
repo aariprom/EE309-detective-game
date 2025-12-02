@@ -164,7 +164,7 @@ class GameViewModel : ViewModel() {
         }
 
         // Placeholder: Return dialogue text
-        // TODO: Replace with LLM 2 (Dialogue Generator) later
+        // TODO: Replace with LLM 3 (Dialogue Generator) later
 
         // For now, just return state with time advanced
         // Time cost: 20 minutes (questioning time)
