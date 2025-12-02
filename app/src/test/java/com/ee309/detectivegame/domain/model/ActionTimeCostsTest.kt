@@ -77,11 +77,13 @@ class ActionTimeCostsTest {
         val place1 = Place(
             id = "place1",
             name = "Place 1",
+            description = "desc",
             connectedPlaces = listOf("place2")
         )
         val place2 = Place(
             id = "place2",
             name = "Place 2",
+            description = "desc",
             connectedPlaces = listOf("place1")
         )
         
@@ -96,12 +98,14 @@ class ActionTimeCostsTest {
         val place1 = Place(
             id = "place1",
             name = "Place 1",
-            connectedPlaces = emptyList()
+            connectedPlaces = emptyList(),
+            description = "desc"
         )
         val place2 = Place(
             id = "place2",
             name = "Place 2",
-            connectedPlaces = emptyList()
+            connectedPlaces = emptyList(),
+            description = "desc"
         )
         
         val time = ActionTimeCosts.getMovementTime(place1, place2)
