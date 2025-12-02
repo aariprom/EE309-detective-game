@@ -39,6 +39,11 @@ object LLMPrompt {
               - `unlock_conditions`: 
                 - `flags`: A list of flag IDs required to unlock meeting this character. Empty list (`[]`) means always available.
                 - `operator`: `"AND"` or `"OR"`. If `flags` is empty, use `"AND"`.
+              - `known_clues`: A list of clue IDs that this character knows about and can reveal through conversation. Characters should know clues related to:
+                - Their location (clues found at places they frequent)
+                - Their role (witnesses know clues they witnessed, suspects know clues related to their involvement)
+                - Their relationships (characters may know clues about people they interact with)
+                - At least 2-5 clues per character is recommended for engaging gameplay
             
             4. Places (`places`)
             - Each place must have:

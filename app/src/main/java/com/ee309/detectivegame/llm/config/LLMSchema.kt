@@ -5,7 +5,7 @@ object LLMSchema {
 
     // currentTime is not set here
     // player.name, collectedClues, flags are not set here
-    // character.knownClues, mentalState, hidden, items are not set here
+    // character.mentalState, hidden, items are not set here (knownClues is now set)
     // place.hidden is not set here
 
     object GameInitializer {
@@ -85,9 +85,16 @@ object LLMSchema {
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "knownClues": {
+                          "type": "array",
+                          "description": "List of clue IDs that this character knows about and can reveal through conversation. Characters should know clues related to their role, location, or involvement in the case.",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
-                      "required": ["id", "name", "description", "initialLocation", "isCriminal", "unlockConditions"]
+                      "required": ["id", "name", "description", "initialLocation", "isCriminal", "unlockConditions", "knownClues"]
                     }
                   },
                   "places": {
