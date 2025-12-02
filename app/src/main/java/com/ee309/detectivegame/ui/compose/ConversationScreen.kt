@@ -83,6 +83,26 @@ fun ConversationScreen(
             )
         )
         
+        // Current time display
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Current time: ${getCurrentAbsoluteTime(gameState).format()}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        
         // Message list
         LazyColumn(
             state = listState,
@@ -114,9 +134,7 @@ fun ConversationScreen(
                     } else {
                         ConversationMessageBubble(
                             message = message,
-                            isFromPlayer = message.isFromPlayer,
-                            previousMessage = messages.getOrNull(messages.indexOf(message) - 1),
-                            startTime = gameState.timeline.startTime
+                            isFromPlayer = message.isFromPlayer
                         )
                     }
                 }
@@ -185,8 +203,6 @@ enum class ConversationMessageType {
 private fun ConversationMessageBubble(
     message: ConversationMessage,
     isFromPlayer: Boolean,
-    previousMessage: ConversationMessage?,
-    startTime: GameTime,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -220,9 +236,9 @@ private fun ConversationMessageBubble(
                 }
             }
         }
-        // Time display
+        // Time display (absolute time)
         Text(
-            text = formatMessageTime(message.timestamp, previousMessage?.timestamp, startTime),
+            text = formatMessageTime(message.timestamp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             modifier = Modifier.padding(
@@ -259,30 +275,18 @@ private fun SystemMessageBubble(
 }
 
 /**
- * Formats the time display for a message
+ * Formats the time display for a message.
+ * messageTime is already absolute time, so just format it.
  */
-private fun formatMessageTime(
-    messageTime: GameTime,
-    previousTime: GameTime?,
-    startTime: GameTime
-): String {
-    val absoluteMessageTime = GameTime(startTime.minutes + messageTime.minutes)
-    
-    // If there's a previous message, show relative time
-    if (previousTime != null) {
-        val previousAbsoluteTime = GameTime(startTime.minutes + previousTime.minutes)
-        val minutesDiff = absoluteMessageTime.minutes - previousAbsoluteTime.minutes
-        
-        return when {
-            minutesDiff <= 0 -> "Just now"
-            minutesDiff < 5 -> "Just now"
-            minutesDiff < 60 -> "$minutesDiff min ago"
-            else -> absoluteMessageTime.format()
-        }
-    }
-    
-    // First message or no previous message - show absolute time
-    return absoluteMessageTime.format()
+private fun formatMessageTime(messageTime: GameTime): String {
+    return messageTime.format()  // Returns "HH:MM"
+}
+
+/**
+ * Gets the current absolute time from game state
+ */
+private fun getCurrentAbsoluteTime(gameState: GameState): GameTime {
+    return GameTime(gameState.timeline.startTime.minutes + gameState.currentTime.minutes)
 }
 
 /**

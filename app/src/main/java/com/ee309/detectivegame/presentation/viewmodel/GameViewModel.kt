@@ -302,11 +302,14 @@ class GameViewModel @Inject constructor(
         val previousCollectedClues = state.player.collectedClues.toSet()
         val previousMentalState = character.mentalState
         
+        // Calculate absolute time for player's question
+        val absoluteTimeNow = GameTime(state.timeline.startTime.minutes + state.currentTime.minutes)
+        
         // Add player's question to conversation history immediately
         addConversationMessage(characterId, ConversationMessage(
             text = question,
             isFromPlayer = true,
-            timestamp = state.currentTime,
+            timestamp = absoluteTimeNow,
             type = ConversationMessageType.NORMAL
         ))
 
@@ -325,11 +328,13 @@ class GameViewModel @Inject constructor(
             )
         } catch (e: Exception) {
             _dialogueLoading.value = _dialogueLoading.value + (characterId to false)
+            // Calculate absolute time for error message
+            val absoluteTimeNow = GameTime(state.timeline.startTime.minutes + state.currentTime.minutes)
             // Add error message to conversation
             addConversationMessage(characterId, ConversationMessage(
                 text = "Error: Failed to build dialogue request. ${e.message ?: "Unknown error"}",
                 isFromPlayer = false,
-                timestamp = state.currentTime,
+                timestamp = absoluteTimeNow,
                 type = ConversationMessageType.NORMAL
             ))
             return state
@@ -351,6 +356,8 @@ class GameViewModel @Inject constructor(
             )
         } catch (e: Exception) {
             _dialogueLoading.value = _dialogueLoading.value + (characterId to false)
+            // Calculate absolute time for error message
+            val absoluteTimeNow = GameTime(state.timeline.startTime.minutes + state.currentTime.minutes)
             // Add error message to conversation instead of just setting UI state
             val errorMessage = when {
                 e.message?.contains("timeout", ignoreCase = true) == true -> 
@@ -365,7 +372,7 @@ class GameViewModel @Inject constructor(
             addConversationMessage(characterId, ConversationMessage(
                 text = errorMessage,
                 isFromPlayer = false,
-                timestamp = state.currentTime,
+                timestamp = absoluteTimeNow,
                 type = ConversationMessageType.NORMAL
             ))
             return state
@@ -374,10 +381,12 @@ class GameViewModel @Inject constructor(
         // Check for empty response
         if (dialogueResponse.isBlank()) {
             _dialogueLoading.value = _dialogueLoading.value + (characterId to false)
+            // Calculate absolute time for error message
+            val absoluteTimeNow = GameTime(state.timeline.startTime.minutes + state.currentTime.minutes)
             addConversationMessage(characterId, ConversationMessage(
                 text = "Error: Received empty response from server. Please try again.",
                 isFromPlayer = false,
-                timestamp = state.currentTime,
+                timestamp = absoluteTimeNow,
                 type = ConversationMessageType.NORMAL
             ))
             return state
@@ -392,11 +401,13 @@ class GameViewModel @Inject constructor(
             }
             is LLMResponseProcessor.ProcessingResult.Failure -> {
                 _dialogueLoading.value = _dialogueLoading.value + (characterId to false)
+                // Calculate absolute time for error message
+                val absoluteTimeNow = GameTime(state.timeline.startTime.minutes + state.currentTime.minutes)
                 // Add error message to conversation
                 addConversationMessage(characterId, ConversationMessage(
                     text = "Error: Failed to process dialogue response. ${dialogueResult.error.message}",
                     isFromPlayer = false,
-                    timestamp = state.currentTime,
+                    timestamp = absoluteTimeNow,
                     type = ConversationMessageType.NORMAL
                 ))
                 return state
@@ -408,12 +419,14 @@ class GameViewModel @Inject constructor(
         
         // Advance time by questioning time cost (before adding character response)
         val timeAfterQuestion = state.currentTime.addMinutes(ActionTimeCosts.QUESTIONING_TIME)
+        // Calculate absolute time for character response
+        val absoluteTimeAfter = GameTime(state.timeline.startTime.minutes + timeAfterQuestion.minutes)
         
         // Add character's response to conversation history
         addConversationMessage(characterId, ConversationMessage(
             text = dialogueData.dialogue,
             isFromPlayer = false,
-            timestamp = timeAfterQuestion,
+            timestamp = absoluteTimeAfter,
             type = ConversationMessageType.NORMAL
         ))
         
@@ -474,8 +487,8 @@ class GameViewModel @Inject constructor(
                     "You found ${clueNames.size} clues: ${clueNames.joinToString(", ")}"
                 }
                 
-                // Add system message for clue collection
-                addSystemMessage(characterId, clueText, timeAfterQuestion)
+                // Add system message for clue collection (use absolute time)
+                addSystemMessage(characterId, clueText, absoluteTimeAfter)
             }
         }
         
@@ -490,11 +503,11 @@ class GameViewModel @Inject constructor(
             }
             newState = newState.copy(characters = updatedCharacters)
             
-            // Add system message for mental state change
+            // Add system message for mental state change (use absolute time)
             addSystemMessage(
                 characterId,
                 "${character.name}'s mood changed to ${dialogueData.mentalStateUpdate}",
-                timeAfterQuestion
+                absoluteTimeAfter
             )
         }
         
