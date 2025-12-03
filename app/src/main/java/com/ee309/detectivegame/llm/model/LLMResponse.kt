@@ -34,6 +34,7 @@ data class CharacterResponse(
     val traits: List<String>,
     val initialLocation: String,
     val isCriminal: Boolean,
+    val isVictim: Boolean = false,
     val unlockConditions: List<String>,
     val knownClues: List<String> = emptyList()
 ) {
@@ -44,6 +45,7 @@ data class CharacterResponse(
             traits = traits,
             currentLocation = initialLocation,
             isCriminal = isCriminal,
+            isVictim = isVictim,
             unlockConditions = unlockConditions,
             knownClues = knownClues
         )

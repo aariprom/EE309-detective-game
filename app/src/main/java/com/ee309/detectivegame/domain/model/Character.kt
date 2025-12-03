@@ -11,6 +11,7 @@ data class Character(
     val name: String,
     val traits: List<String> = emptyList(),
     val isCriminal: Boolean = false,
+    val isVictim: Boolean = false,
     val knownClues: List<String> = emptyList(),
     val mentalState: String = "Normal",
     val hidden: Boolean = false,

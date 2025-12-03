@@ -79,6 +79,10 @@ object LLMSchema {
                           "type": "boolean",
                           "description": "True if this character is the criminal; false otherwise."
                         },
+                        "isVictim": {
+                          "type": "boolean",
+                          "description": "True if this character is the victim; exactly one victim, cannot be criminal."
+                        },
                         "unlockConditions": {
                           "type": "array",
                           "description": "List of flag IDs required.",

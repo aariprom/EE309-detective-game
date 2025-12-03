@@ -95,6 +95,15 @@ object LLMResponseProcessor {
             ) : ValidationError(message)
             data class NoCriminal(override val message: String = "No criminal found in game data") : ValidationError(message)
             data class MultipleCriminals(override val message: String = "Multiple criminals found in game data") : ValidationError(message)
+            data class MissingVictim(
+                override val message: String = "No victim found in game data"
+            ) : ValidationError(message)
+            data class MultipleVictims(
+                override val message: String = "Multiple victims found in game data"
+            ) : ValidationError(message)
+            data class VictimIsCriminal(
+                override val message: String = "Victim cannot be the criminal"
+            ) : ValidationError(message)
             data class InvalidTimeline(
                 override val message: String = "Timeline is invalid: startTime must be before endTime"
             ) : ValidationError(message)
@@ -190,6 +199,20 @@ object LLMResponseProcessor {
                     "Found ${criminals.size} criminals: ${criminals.joinToString { it.id }}"
                 ))
             }
+
+            // Validate exactly one victim exists
+            val victims = gameState.characters.filter { it.isVictim }
+            when {
+                victims.isEmpty() -> errors.add(ValidationError.MissingVictim())
+                victims.size > 1 -> errors.add(ValidationError.MultipleVictims())
+            }
+
+            // Victim cannot be the criminal
+            val victimAndCriminal = gameState.characters.firstOrNull { it.isVictim && it.isCriminal }
+            if (victimAndCriminal != null) {
+                errors.add(ValidationError.VictimIsCriminal())
+            }
+
             
             // Validate timeline structure - all times are absolute
             val timeline = gameState.timeline

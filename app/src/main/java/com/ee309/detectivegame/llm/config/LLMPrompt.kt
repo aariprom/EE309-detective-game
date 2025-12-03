@@ -36,6 +36,8 @@ object LLMPrompt {
               - `description`: Personality, role, and any relevant background.
               - `initial_location`: Must be the `id` of an existing Place in `places`.
               - `is_criminal`: `true` for exactly one character, `false` for all others.
+              - `is_victim`: `true` for exactly one victim (the person who died), `false` for all others.
+                  There must be exactly one criminal and exactly one victim, and they cannot be the same character.
               - `unlock_conditions`: 
                 - `flags`: A list of flag IDs required to unlock meeting this character. Empty list (`[]`) means always available.
                 - `operator`: `"AND"` or `"OR"`. If `flags` is empty, use `"AND"`.
