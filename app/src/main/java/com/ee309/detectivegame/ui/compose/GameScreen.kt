@@ -1,6 +1,11 @@
 package com.ee309.detectivegame.ui.compose
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -12,8 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.ee309.detectivegame.domain.model.Clue
 import com.ee309.detectivegame.domain.model.GameAction
 import com.ee309.detectivegame.domain.model.GamePhase
+import com.ee309.detectivegame.domain.model.GameState
 import com.ee309.detectivegame.presentation.state.GameUiState
 import com.ee309.detectivegame.presentation.viewmodel.GameViewModel
 import kotlinx.serialization.InternalSerializationApi
@@ -26,17 +33,29 @@ fun GameScreen(
     val uiState by viewModel.uiState.collectAsState()
     val gameState by viewModel.gameState.collectAsState()
     val conversationHistory by viewModel.conversationHistory.collectAsState()
+    val dialogueLoading by viewModel.dialogueLoading.collectAsState()
+    val introText by viewModel.introText.collectAsState()
+    val introShown by viewModel.introShown.collectAsState()
     
     // Local state for dialogs and conversation
     var showCharacterDialog by remember { mutableStateOf(false) }
     var showPlaceDialog by remember { mutableStateOf(false) }
     var dialogActionType by remember { mutableStateOf<DialogActionType?>(null) }
     var conversationCharacterId by remember { mutableStateOf<String?>(null) }
+    var selectedClueId by remember { mutableStateOf<String?>(null) }
     
     // Show StartScreen if game hasn't started (gameState is null)
     when {
         gameState == null -> {
             StartScreen(viewModel = viewModel)
+        }
+        
+        // Show IntroScreen if intro text is available and hasn't been shown yet
+        introText != null && !introShown -> {
+            IntroScreen(
+                introText = introText!!,
+                onContinue = { viewModel.onIntroComplete() }
+            )
         }
         
         uiState is GameUiState.Success -> {
@@ -48,6 +67,7 @@ fun GameScreen(
                 GamePhase.WIN, GamePhase.LOSE -> {
                     GameOverScreen(
                         phase = currentGameState.phase,
+                        gameState = currentGameState,
                         onRestart = {
                             viewModel.startNewGame("")
                             conversationCharacterId = null
@@ -56,17 +76,32 @@ fun GameScreen(
                 }
                 
                 else -> {
+                    // Show clue detail screen if a clue is selected
+                    selectedClueId?.let { clueId ->
+                        val clue = currentGameState.getClue(clueId)
+                        if (clue != null) {
+                            ClueDetailScreen(
+                                clue = clue,
+                                gameState = currentGameState,
+                                onBack = { selectedClueId = null }
+                            )
+                            return
+                        }
+                    }
+                    
                     // Show conversation screen if a character is being questioned
                     conversationCharacterId?.let { charId ->
                         val character = currentGameState.getCharacter(charId)
                         if (character != null) {
+                            val isLoading = viewModel.dialogueLoading.value[charId] ?: false
                             ConversationScreen(
                                 character = character,
                                 messages = conversationHistory[charId] ?: emptyList(),
+                                gameState = currentGameState,
+                                isLoading = isLoading,
                                 onBack = { conversationCharacterId = null },
                                 onSendMessage = { message ->
-                                    viewModel.addConversationMessage(charId, ConversationMessage(message, true))
-                                    viewModel.addConversationMessage(charId, ConversationMessage("[Character response placeholder]", false))
+                                    viewModel.executeAction(GameAction.Question(charId, message))
                                 }
                             )
                             return
@@ -97,7 +132,8 @@ fun GameScreen(
                         onAccuseClick = {
                             dialogActionType = DialogActionType.Accuse
                             showCharacterDialog = true
-                        }
+                        },
+                        onClueClick = { clueId -> selectedClueId = clueId }
                     )
                     
                     // Character selection dialog
@@ -123,11 +159,7 @@ fun GameScreen(
                                 when (dialogActionType) {
                                     DialogActionType.Question -> {
                                         conversationCharacterId = character.id
-                                        val existingHistory = viewModel.getConversationHistory(character.id)
-                                        if (existingHistory.isEmpty()) {
-                                            viewModel.addConversationMessage(character.id, ConversationMessage("You start questioning ${character.name}...", false))
-                                        }
-                                        viewModel.executeAction(GameAction.Question(character.id))
+                                        // No initial greeting - user must send a message to start conversation
                                     }
                                     DialogActionType.Accuse -> {
                                         viewModel.executeAction(GameAction.Accuse(character.id))
@@ -235,12 +267,13 @@ private fun MainGameScreenContent(
     onInvestigateClick: () -> Unit,
     onQuestionClick: () -> Unit,
     onMoveClick: () -> Unit,
-    onAccuseClick: () -> Unit
+    onAccuseClick: () -> Unit,
+    onClueClick: (String) -> Unit
 ) {
     val currentPlace = gameState.getCurrentLocation()
-    val timeRemaining = gameState.timeline.endTime.minutes - gameState.currentTime.minutes
-    val timeRemainingHours = timeRemaining / 60
-    val timeRemainingMinutes = timeRemaining % 60
+    val remainingTime = gameState.getRemainingTime()
+    val remainingTimeHours = remainingTime.hours
+    val remainingTimeMinutes = remainingTime.minutesOfHour
     
     Column(
         modifier = Modifier
@@ -256,7 +289,8 @@ private fun MainGameScreenContent(
             // Time display widget
             TimeDisplayWidget(
                 currentTime = gameState.currentTime,
-                timeRemaining = "$timeRemainingHours:${String.format("%02d", timeRemainingMinutes)}",
+                startTime = gameState.timeline.startTime,
+                timeRemaining = "$remainingTimeHours:${String.format("%02d", remainingTimeMinutes)}",
                 modifier = Modifier.weight(1f)
             )
             
@@ -278,6 +312,7 @@ private fun MainGameScreenContent(
             collectedClues = gameState.player.collectedClues.mapNotNull { clueId ->
                 gameState.getClue(clueId)
             },
+            onClueClick = { clue -> onClueClick(clue.id) },
             modifier = Modifier.fillMaxWidth()
         )
         
@@ -300,6 +335,7 @@ private fun MainGameScreenContent(
 @Composable
 private fun TimeDisplayWidget(
     currentTime: com.ee309.detectivegame.domain.model.GameTime,
+    startTime: com.ee309.detectivegame.domain.model.GameTime,
     timeRemaining: String,
     modifier: Modifier = Modifier
 ) {
@@ -313,7 +349,7 @@ private fun TimeDisplayWidget(
             modifier = Modifier.padding(12.dp)
         ) {
             Text(
-                text = "Time: ${currentTime.format()}",
+                text = "Time: ${currentTime.formatWithStart(startTime)}",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -358,6 +394,7 @@ private fun LocationDisplayWidget(
 @Composable
 private fun InventoryDisplayWidget(
     collectedClues: List<com.ee309.detectivegame.domain.model.Clue>,
+    onClueClick: (com.ee309.detectivegame.domain.model.Clue) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -399,11 +436,132 @@ private fun InventoryDisplayWidget(
                         Text(
                             text = "• ${clue.name}",
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(vertical = 2.dp)
+                            modifier = Modifier
+                                .clickable { onClueClick(clue) }
+                                .padding(vertical = 2.dp)
                         )
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Screen displaying detailed information about a clue.
+ */
+@OptIn(ExperimentalMaterial3Api::class, InternalSerializationApi::class)
+@Composable
+fun ClueDetailScreen(
+    clue: Clue,
+    gameState: GameState,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val locationName = resolveLocationName(clue.location, gameState)
+    
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        // Top bar with back button
+        TopAppBar(
+            title = {
+                Text(text = "Clue Details")
+            },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.DirectionsRun,
+                        contentDescription = "Back"
+                    )
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        )
+        
+        // Content area
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Clue ID (small, muted)
+            Text(
+                text = "ID: ${clue.id}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+            
+            // Clue Name (title)
+            Text(
+                text = clue.name,
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            HorizontalDivider()
+            
+            // Location section
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Column {
+                    Text(
+                        text = "Location",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = locationName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            
+            HorizontalDivider()
+            
+            // Description section
+            Column {
+                Text(
+                    text = "Description",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    text = clue.description,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.5
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Resolves a location ID to a display name.
+ * Checks if it's a place ID or character ID and returns the appropriate name.
+ */
+@OptIn(InternalSerializationApi::class)
+private fun resolveLocationName(locationId: String, gameState: GameState): String {
+    return when {
+        locationId.isEmpty() -> "Unknown Location"
+        gameState.getPlace(locationId) != null -> gameState.getPlace(locationId)!!.name
+        gameState.getCharacter(locationId) != null -> gameState.getCharacter(locationId)!!.name
+        else -> locationId // Fallback to ID if not found
     }
 }

@@ -55,7 +55,8 @@ This document breaks down the Android detective game project into manageable mod
 
 **Architecture Overview**:
 - **LLM 1 (Initializer)**: Generates complete game structure upfront (characters, places, clues, timeline)
-- **LLM 2-5 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions, actions, updates)
+- **LLM 2 (Intro Generator)**: Generates introduction text before game starts
+- **LLM 3-6 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions, actions, updates)
 - **Caching**: Cache generated content to improve performance and reduce costs
 
 ### 2.1 LLM API Client
@@ -84,7 +85,19 @@ This document breaks down the Android detective game project into manageable mod
   - Use structured output (JSON schema, function calling) for reliable parsing
   - **NOT** generating: dialogue, detailed descriptions (these are lazy-loaded)
 
-### 2.3 LLM 2: Dialogue Generator (Lazy Loading)
+### 2.3 LLM 2: Intro Generator (Initial Generation)
+- **Priority**: HIGH (Critical Path)
+- **Difficulty**: MEDIUM
+- **Feasibility**: ✅ POSSIBLE
+- **Description**:
+  - **Single LLM call** after LLM 1 generates GameState
+  - Generate compelling, spoiler-free introduction text
+  - Input: Public information from GameState (title, description, characters, places, timeline)
+  - Output: Introduction text (3-7 paragraphs) in JSON format
+  - Shown to player before game starts
+  - No spoilers (isCriminal, hidden clues excluded)
+
+### 2.4 LLM 3: Dialogue Generator (Lazy Loading)
 - **Priority**: HIGH (Critical Path)
 - **Difficulty**: MEDIUM-HIGH
 - **Feasibility**: ✅ POSSIBLE
@@ -97,7 +110,7 @@ This document breaks down the Android detective game project into manageable mod
   - **Caching**: Cache dialogue for same character + same context (time, player clues)
   - Extract clues from conversations for clue system
 
-### 2.4 LLM 3: Description Generator (Lazy Loading)
+### 2.5 LLM 4: Description Generator (Lazy Loading)
 - **Priority**: MEDIUM
 - **Difficulty**: MEDIUM
 - **Feasibility**: ✅ POSSIBLE
@@ -109,7 +122,7 @@ This document breaks down the Android detective game project into manageable mod
   - Epilogue generation for game endings
   - **Caching**: Cache descriptions for same place/character + same time state
 
-### 2.5 LLM 4: Action Handler (Lazy Loading)
+### 2.6 LLM 5: Action Handler (Lazy Loading)
 - **Priority**: MEDIUM
 - **Difficulty**: HIGH
 - **Feasibility**: ⚠️ CHALLENGING (Requires strong validation)
@@ -121,7 +134,7 @@ This document breaks down the Android detective game project into manageable mod
   - Generate narrative for action outcomes
   - **Caching**: Rarely (actions are usually unique), but cache common actions
 
-### 2.6 LLM 5: Component Updater (Lazy Loading)
+### 2.7 LLM 6: Component Updater (Lazy Loading)
 - **Priority**: HIGH (Critical Path)
 - **Difficulty**: MEDIUM-HIGH
 - **Feasibility**: ✅ POSSIBLE
@@ -140,7 +153,7 @@ This document breaks down the Android detective game project into manageable mod
 - **Feasibility**: ⚠️ CHALLENGING (Requires structured output parsing)
 - **Description**:
   - Parse LLM responses to extract structured clues
-  - Used by LLM 2 (Dialogue) and LLM 3 (Descriptions)
+  - Used by LLM 3 (Dialogue) and LLM 4 (Descriptions)
   - Convert narrative output to clue objects (who, what, when, where, why)
   - Validate clue format and completeness
   - Use structured output formats (JSON, function calling) when possible
@@ -327,8 +340,8 @@ This document breaks down the Android detective game project into manageable mod
 - **Feasibility**: ✅ POSSIBLE
 - **Description**:
   - Handle place investigation actions
-  - Trigger **LLM 3 (Description Generator)** to generate place description
-  - Generate clues based on investigation (via LLM 3 or direct extraction)
+  - Trigger **LLM 4 (Description Generator)** to generate place description
+  - Generate clues based on investigation (via LLM 4 or direct extraction)
   - Check cache before calling LLM (same place + same time state)
   - Time consumption calculation
   - Failure conditions (time-based, insufficient prerequisites)
@@ -339,10 +352,10 @@ This document breaks down the Android detective game project into manageable mod
 - **Feasibility**: ✅ POSSIBLE
 - **Description**:
   - Initiate questioning with character
-  - Trigger **LLM 2 (Dialogue Generator)** for conversation flow
+  - Trigger **LLM 3 (Dialogue Generator)** for conversation flow
   - Check cache before calling LLM (same character + same context)
-  - Extract clues from conversation (via LLM 2 or clue extraction system)
-  - Cooperation level affecting responses (passed to LLM 2)
+  - Extract clues from conversation (via LLM 3 or clue extraction system)
+  - Cooperation level affecting responses (passed to LLM 3)
   - Time consumption calculation
 
 ### 5.3 Movement Action Handler
@@ -385,9 +398,9 @@ This document breaks down the Android detective game project into manageable mod
 - **Description**:
   - Process timeline events based on current time
   - Trigger character actions (evidence destruction, movement)
-  - Call **LLM 5 (Component Updater)** to update component states
+  - Call **LLM 6 (Component Updater)** to update component states
   - Check cache before calling LLM (same event + same state)
-  - Generate narrative for timeline events (via LLM 5)
+  - Generate narrative for timeline events (via LLM 6)
 
 ### 5.7 Win/Lose Condition Checker
 - **Priority**: HIGH (Critical Path)
@@ -407,8 +420,8 @@ This document breaks down the Android detective game project into manageable mod
 - **Feasibility**: ✅ POSSIBLE
 - **Description**:
   - Update components after each action/time unit
-  - Coordinate with **LLM 5 (Component Updater)** for timeline-based updates
-  - Apply timeline events to components (via LLM 5)
+  - Coordinate with **LLM 6 (Component Updater)** for timeline-based updates
+  - Apply timeline events to components (via LLM 6)
   - Update character states, place states, clue availability
   - Handle unlock conditions
   - Cache invalidation when components are updated
@@ -426,9 +439,10 @@ This document breaks down the Android detective game project into manageable mod
 
 ### High Priority (Important for Full Experience)
 - Action Validation System (1.4)
-- LLM 3: Description Generator (2.4)
-- Clue Extraction System (2.7)
-- LLM 4: Action Handler (2.5)
+- LLM 2: Intro Generator (2.3)
+- LLM 4: Description Generator (2.5)
+- Clue Extraction System (2.8)
+- LLM 5: Action Handler (2.6)
 - Flag System (3.5)
 - Free Action Input UI (4.4)
 - Game Start Configuration (4.7)
@@ -451,7 +465,7 @@ Most tasks are feasible with standard Android development and LLM API integratio
 ### ⚠️ CHALLENGING
 - **Action Validation (1.4, 5.5)**: Requires sophisticated LLM prompting and validation logic to prevent game-breaking actions while maintaining flexibility.
 - **Clue Extraction (2.7)**: Requires structured output from LLM or robust parsing. May need to use function calling or JSON mode.
-- **LLM 4: Action Handler (2.5)**: Balancing flexibility with game integrity requires careful prompt engineering.
+- **LLM 5: Action Handler (2.6)**: Balancing flexibility with game integrity requires careful prompt engineering.
 
 ### 🔧 Recommended Tech Stack
 
@@ -477,17 +491,18 @@ See **[TECH_STACK.md](./TECH_STACK.md)** for comprehensive tech stack recommenda
 - Basic data models (3.1, 3.2, 3.3, 3.4)
 - LLM API client setup (2.1)
 - **LLM 1: Initial Content Generator** (2.2) - Upfront generation
+- **LLM 2: Intro Generator** (2.3) - Introduction text generation
 
 ### Phase 2: Content System & Runtime LLMs (Weeks 2-3)
 - Complete Character, Place, Clue, Timeline systems (3.1, 3.2, 3.3, 3.4)
-- **LLM 2: Dialogue Generator** (2.3) - Lazy loading for conversations
-- **LLM 3: Description Generator** (2.4) - Lazy loading for descriptions
+- **LLM 3: Dialogue Generator** (2.4) - Lazy loading for conversations
+- **LLM 4: Description Generator** (2.5) - Lazy loading for descriptions
 - **LLM Response Caching System** (2.8) - Performance optimization
 - Clue Extraction System (2.7)
 
 ### Phase 3: Game Logic (Weeks 3-4)
 - Core action handlers (5.1, 5.2, 5.3, 5.4)
-- **LLM 5: Component Updater** (2.6) - Timeline-based updates
+- **LLM 6: Component Updater** (2.7) - Timeline-based updates
 - Timeline event processing (5.6)
 - Win/lose conditions (5.7)
 - Component update logic (5.8)

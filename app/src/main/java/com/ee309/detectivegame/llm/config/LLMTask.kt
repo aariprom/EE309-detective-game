@@ -12,9 +12,18 @@ sealed class LLMTask (
         schema = LLMSchema.GameInitializer.SCHEMA
     )
 
-    // Todo: Implement followings
-    // LLM 2: Dialogue Generator
-    // LLM 3: Description Generator
-    // LLM 4: Action Handler
-    // LLM 5: Component Updater
+    // LLM 2: Intro Generator
+    object IntroGenerator: LLMTask(
+        model = "solar-pro2",
+        systemPrompt = LLMPrompt.IntroGenerator.SYSTEM_PROMPT,
+        schema = LLMSchema.IntroGenerator.SCHEMA
+    )
+    // LLM 3: Dialogue Generator
+    object DialogueGenerator : LLMTask(
+        model = "solar-pro2",
+        systemPrompt = LLMPrompt.DialogueGenerator.SYSTEM_PROMPT,
+        schema = LLMSchema.DialogueGenerator.SCHEMA
+    )
+
+    // LLM 4: Description Generator
 }

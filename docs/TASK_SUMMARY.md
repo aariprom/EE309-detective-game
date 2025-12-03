@@ -4,7 +4,8 @@
 
 The project uses a **Hybrid LLM Architecture**:
 - **LLM 1 (Initializer)**: Generates complete game structure upfront (characters, places, clues, timeline)
-- **LLM 2-5 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions, actions, updates)
+- **LLM 2 (Intro Generator)**: Generates introduction text before game starts
+- **LLM 3-6 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions, actions, updates)
 - **Caching**: Cache generated content to improve performance and reduce costs
 
 See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture documentation.
@@ -40,10 +41,11 @@ See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture docum
 |------|----------|------------|-------------|--------------|
 | 2.1 LLM API Client | HIGH | LOW-MEDIUM | ✅ POSSIBLE | - |
 | 2.2 LLM 1: Initial Content Generator | HIGH | MEDIUM | ✅ POSSIBLE | 2.1, 3.1, 3.2, 3.3 |
-| 2.3 LLM 2: Dialogue Generator | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 2.1, 3.1, 2.8 |
-| 2.4 LLM 3: Description Generator | MEDIUM | MEDIUM | ✅ POSSIBLE | 2.1, 2.8 |
-| 2.5 LLM 4: Action Handler | MEDIUM | HIGH | ⚠️ CHALLENGING | 2.1, 1.4 |
-| 2.6 LLM 5: Component Updater | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 2.1, 3.1, 3.2, 3.3, 2.8 |
+| 2.3 LLM 2: Intro Generator | HIGH | MEDIUM | ✅ POSSIBLE | 2.1, 2.2 |
+| 2.4 LLM 3: Dialogue Generator | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 2.1, 3.1, 2.8 |
+| 2.5 LLM 4: Description Generator | MEDIUM | MEDIUM | ✅ POSSIBLE | 2.1, 2.8 |
+| 2.6 LLM 5: Action Handler | MEDIUM | HIGH | ⚠️ CHALLENGING | 2.1, 1.4 |
+| 2.7 LLM 6: Component Updater | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 2.1, 3.1, 3.2, 3.3, 2.8 |
 | 2.7 Clue Extraction System | MEDIUM | MEDIUM-HIGH | ⚠️ CHALLENGING | 2.1, 3.3 |
 | 2.8 LLM Response Caching System | MEDIUM | MEDIUM | ✅ POSSIBLE | 2.1 |
 
@@ -125,10 +127,10 @@ To build a playable game, these tasks must be completed in order:
    - 4.2 Text Display
    - 4.3 Action Selection
    - 4.5 Character/Place Selection
-   - 4.6 Conversation UI (Integration with LLM 2)
+   - 4.6 Conversation UI (Integration with LLM 3)
 
 5. **Advanced Features** (Week 5+)
-   - **2.5 LLM 4: Action Handler** - Free action system
+   - **2.6 LLM 5: Action Handler** - Free action system
    - 4.7 Game Configuration
    - 1.4, 5.5 Free Action System (if time permits)
 
@@ -138,12 +140,12 @@ To build a playable game, these tasks must be completed in order:
 
 ### High Risk (Requires Careful Planning)
 - **Action Validation (1.4, 5.5)**: Balancing flexibility with game integrity
-- **LLM 4: Action Handler (2.5)**: Balancing flexibility with game integrity
+- **LLM 5: Action Handler (2.6)**: Balancing flexibility with game integrity
 - **Clue Extraction (2.7)**: Ensuring reliable structured output from LLM
 - **Timeline Event Processing (5.6)**: Managing complex state updates
 
 ### Medium Risk
-- **LLM Response Quality**: Ensuring consistent, game-appropriate responses across LLM 2-5
+- **LLM Response Quality**: Ensuring consistent, game-appropriate responses across LLM 2-6
 - **Caching Strategy (2.8)**: Managing cache invalidation correctly
 - **Component Updates (2.6, 5.8)**: Maintaining state consistency across updates
 - **Free Action System**: Preventing exploits while maintaining fun

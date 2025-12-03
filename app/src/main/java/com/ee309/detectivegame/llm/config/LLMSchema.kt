@@ -5,7 +5,7 @@ object LLMSchema {
 
     // currentTime is not set here
     // player.name, collectedClues, flags are not set here
-    // character.knownClues, mentalState, hidden, items are not set here
+    // character.mentalState, hidden, items are not set here (knownClues is now set)
     // place.hidden is not set here
 
     object GameInitializer {
@@ -85,9 +85,16 @@ object LLMSchema {
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "knownClues": {
+                          "type": "array",
+                          "description": "List of clue IDs that this character knows about and can reveal through conversation. Characters should know clues related to their role, location, or involvement in the case.",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
-                      "required": ["id", "name", "description", "initialLocation", "isCriminal", "unlockConditions"]
+                      "required": ["id", "name", "description", "initialLocation", "isCriminal", "unlockConditions", "knownClues"]
                     }
                   },
                   "places": {
@@ -171,17 +178,29 @@ object LLMSchema {
                   "timeline": {
                     "type": "object",
                     "additionalProperties": false,
-                    "description": "Defines the temporal structure of the case, including key events.",
+                    "description": "Defines the temporal structure of the case, including key events. All times (baseTime, startTime, endTime, events) are stored as absolute times in minutes from midnight.",
                     "properties": {
+                      "baseTime": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "minutes": {
+                            "type": "number",
+                            "description": "Absolute time reference point in minutes from midnight. For example, 960 minutes = 16:00 (4 PM). This is the earliest point in the timeline. Crime events occur between baseTime and startTime. Must be < startTime."
+                          }
+                        },
+                        "required": ["minutes"]
+                      },
                       "startTime": {
                         "type": "object",
                         "additionalProperties": false,
                         "properties": {
                           "minutes": {
                             "type": "number",
-                            "description": "Time as minutes, startTime is usually 0"
+                            "description": "Absolute time in minutes from midnight when the game starts. For example, 1080 minutes = 18:00 (6 PM). Must be > baseTime and < endTime. The crime event MUST occur between baseTime and startTime."
                           }
-                        }
+                        },
+                        "required": ["minutes"]
                       },
                       "endTime": {
                         "type": "object",
@@ -189,13 +208,14 @@ object LLMSchema {
                         "properties": {
                           "minutes": {
                             "type": "number",
-                            "description": "Time as minutes, endTime is usually 480"
+                            "description": "Absolute time in minutes from midnight when the game ends. For example, 1440 minutes = 24:00 (midnight). Must be > startTime."
                           }
-                        }
+                        },
+                        "required": ["minutes"]
                       },
                       "events": {
                         "type": "array",
-                        "description": "Chronological list of events that modify the game state.",
+                        "description": "Chronological list of events that modify the game state. Events are stored as absolute time in minutes from midnight (same format as baseTime, startTime, endTime). You MUST include exactly one CRIME event with eventType='CRIME' that occurs between baseTime and startTime.",
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -210,14 +230,15 @@ object LLMSchema {
                               "properties": {
                                 "minutes": {
                                   "type": "number",
-                                  "description": "Time as minutes, start from 0 to at max endTime-startTime."
+                                  "description": "Absolute time in minutes from midnight (same format as baseTime, startTime, endTime). For crime events, this must be between baseTime.minutes and startTime.minutes. For game events, this must be between startTime.minutes and endTime.minutes."
                                 }
-                              }
+                              },
+                              "required": ["minutes"]
                             },
                             "eventType": {
                               "type": "string",
-                              "description": "Type of event.",
-                              "enum": ["CHARACTER_MOVEMENT", "PLACE_CHANGE", "CUSTOM"]
+                              "description": "Type of event. CRIME events must occur before the game starts (between baseTime and startTime, all absolute times).",
+                              "enum": ["CHARACTER_MOVEMENT", "PLACE_CHANGE", "CRIME", "CUSTOM"]
                             },
                             "description": {
                               "type": "string",
@@ -236,7 +257,7 @@ object LLMSchema {
                         }
                       }
                     },
-                    "required": ["startTime", "endTime", "events"]
+                    "required": ["baseTime", "startTime", "endTime", "events"]
                   },
                   "flags": {
                     "type": "array",
@@ -275,9 +296,65 @@ object LLMSchema {
     }
 
     // Todo: Implement followings
-    // LLM 2: Dialogue Generator
-    // LLM 3: Description Generator
-    // LLM 4: Action Handler
-    // LLM 5: Component Updater
+    // LLM 2: Intro Generator
+    object IntroGenerator {
+        val SCHEMA = """
+            {
+              "name": "intro",
+              "strict": true,
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "The intro text to show to the player."
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+    }
+
+    // LLM 3: Dialogue Generator
+    object DialogueGenerator {
+        val SCHEMA = """
+            {
+              "name": "dialogue",
+              "strict": true,
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "dialogue": {
+                    "type": "string",
+                    "description": "The character's response dialogue text. Should be natural conversation, 1-6 sentences typically."
+                  },
+                  "newClues": {
+                    "type": "array",
+                    "description": "Optional array of clue IDs that were revealed during this conversation. Only include clues that are in the character's knownClues list.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mentalStateUpdate": {
+                    "type": "string",
+                    "description": "Optional updated mental state of the character after this conversation. Common values: 'Normal', 'Nervous', 'Angry', 'Helpful', 'Suspicious'. Only include if the mental state actually changed."
+                  },
+                  "hints": {
+                    "type": "array",
+                    "description": "Optional array of subtle hints or contradictions that may help the player. Used for game design purposes.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": ["dialogue"]
+              }
+            }
+        """.trimIndent()
+    }
+
+    // LLM 4: Description Generator
 }
 

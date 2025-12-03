@@ -34,7 +34,8 @@ data class CharacterResponse(
     val traits: List<String>,
     val initialLocation: String,
     val isCriminal: Boolean,
-    val unlockConditions: List<String>
+    val unlockConditions: List<String>,
+    val knownClues: List<String> = emptyList()
 ) {
     fun toCharacter(): Character {
         return Character(
@@ -44,6 +45,7 @@ data class CharacterResponse(
             currentLocation = initialLocation,
             isCriminal = isCriminal,
             unlockConditions = unlockConditions,
+            knownClues = knownClues
         )
     }
 }
@@ -103,12 +105,14 @@ data class TimeResponse(
 @InternalSerializationApi
 @Serializable
 data class TimelineResponse(
+    val baseTime: TimeResponse,
     val startTime: TimeResponse,
     val endTime: TimeResponse,
     val events: List<TimelineEventResponse>
 ) {
     fun toTimeline(): Timeline {
         return Timeline(
+            baseTime = baseTime.toGameTime(),
             startTime = startTime.toGameTime(),
             endTime = endTime.toGameTime(),
             events = events.map { it.toTimelineEvent() }

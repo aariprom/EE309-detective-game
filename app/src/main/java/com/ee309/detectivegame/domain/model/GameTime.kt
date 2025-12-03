@@ -29,5 +29,23 @@ data class GameTime(
     fun format(): String {
         return String.format("%02d:%02d", hours, minutesOfHour)
     }
+    
+    /**
+     * Formats time with a start time.
+     * Used to display game time as a realistic time of day.
+     * 
+     * @param startTime The absolute time when the game starts (e.g., 1080 = 18:00).
+     * @return Formatted time string as HH:MM representing startTime + this.
+     * 
+     * Example:
+     * - startTime = 18:00 (1080 minutes)
+     * - this = 30 minutes (relative to startTime)
+     * - Result: (1080 + 30) = 1110 minutes = 18:30
+     */
+    fun formatWithStart(startTime: GameTime): String {
+        val absoluteMinutes = startTime.minutes + this.minutes
+        val absoluteTime = GameTime(absoluteMinutes)
+        return absoluteTime.format()
+    }
 }
 

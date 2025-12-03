@@ -17,6 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ee309.detectivegame.domain.model.Character
+import com.ee309.detectivegame.domain.model.GameState
+import com.ee309.detectivegame.domain.model.GameTime
+import kotlinx.serialization.InternalSerializationApi
 
 /**
  * Conversation/Interrogation screen with chat-like interface for questioning characters.
@@ -26,6 +29,8 @@ import com.ee309.detectivegame.domain.model.Character
 fun ConversationScreen(
     character: Character,
     messages: List<ConversationMessage>,
+    gameState: GameState,
+    isLoading: Boolean = false,
     onBack: () -> Unit,
     onSendMessage: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -33,10 +38,11 @@ fun ConversationScreen(
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
     
-    // Auto-scroll to bottom when new messages are added
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    // Auto-scroll to bottom when new messages are added or loading state changes
+    LaunchedEffect(messages.size, isLoading) {
+        val itemCount = messages.size + if (isLoading) 1 else 0
+        if (itemCount > 0) {
+            listState.animateScrollToItem(itemCount - 1)
         }
     }
     
@@ -54,6 +60,13 @@ fun ConversationScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
+                    // Clue progress indicator
+                    val (collected, total) = getClueProgress(character, gameState)
+                    Text(
+                        text = "Clues: $collected/$total found",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
                 }
             },
             navigationIcon = {
@@ -69,6 +82,26 @@ fun ConversationScreen(
                 titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
         )
+        
+        // Current time display
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Current time: ${getCurrentAbsoluteTime(gameState).format()}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         
         // Message list
         LazyColumn(
@@ -96,10 +129,21 @@ fun ConversationScreen(
                 }
             } else {
                 items(messages) { message ->
-                    ConversationMessageBubble(
-                        message = message,
-                        isFromPlayer = message.isFromPlayer
-                    )
+                    if (message.type == ConversationMessageType.SYSTEM) {
+                        SystemMessageBubble(message = message)
+                    } else {
+                        ConversationMessageBubble(
+                            message = message,
+                            isFromPlayer = message.isFromPlayer
+                        )
+                    }
+                }
+                
+                // Show loading indicator when character is generating response
+                if (isLoading) {
+                    item {
+                        ConversationLoadingIndicator()
+                    }
                 }
             }
         }
@@ -120,7 +164,7 @@ fun ConversationScreen(
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Type your question...") },
                 singleLine = true,
-                enabled = true
+                enabled = !isLoading
             )
             Button(
                 onClick = {
@@ -129,7 +173,7 @@ fun ConversationScreen(
                         inputText = ""
                     }
                 },
-                enabled = inputText.isNotBlank()
+                enabled = inputText.isNotBlank() && !isLoading
             ) {
                 Text("Send")
             }
@@ -142,8 +186,18 @@ fun ConversationScreen(
  */
 data class ConversationMessage(
     val text: String,
-    val isFromPlayer: Boolean
+    val isFromPlayer: Boolean,
+    val timestamp: GameTime,
+    val type: ConversationMessageType = ConversationMessageType.NORMAL
 )
+
+/**
+ * Type of conversation message
+ */
+enum class ConversationMessageType {
+    NORMAL,  // Regular player/character messages
+    SYSTEM   // Game state change notifications
+}
 
 @Composable
 private fun ConversationMessageBubble(
@@ -151,30 +205,134 @@ private fun ConversationMessageBubble(
     isFromPlayer: Boolean,
     modifier: Modifier = Modifier
 ) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = if (isFromPlayer) Alignment.End else Alignment.Start
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (isFromPlayer) Arrangement.End else Arrangement.Start
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = if (isFromPlayer) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
+                tonalElevation = 2.dp,
+                modifier = Modifier.widthIn(max = 280.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = message.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isFromPlayer) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            }
+        }
+        // Time display (absolute time)
+        Text(
+            text = formatMessageTime(message.timestamp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            modifier = Modifier.padding(
+                horizontal = 16.dp,
+                vertical = 2.dp
+            )
+        )
+    }
+}
+
+@Composable
+private fun SystemMessageBubble(
+    message: ConversationMessage,
+    modifier: Modifier = Modifier
+) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (isFromPlayer) Arrangement.End else Arrangement.Start
+        horizontalArrangement = Arrangement.Center
     ) {
         Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = if (isFromPlayer) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-            tonalElevation = 2.dp,
-            modifier = Modifier.widthIn(max = 280.dp)
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+            tonalElevation = 1.dp,
+            modifier = Modifier.widthIn(max = 300.dp)
         ) {
             Text(
                 text = message.text,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(12.dp),
-                color = if (isFromPlayer) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.onTertiaryContainer
             )
+        }
+    }
+}
+
+/**
+ * Formats the time display for a message.
+ * messageTime is already absolute time, so just format it.
+ */
+private fun formatMessageTime(messageTime: GameTime): String {
+    return messageTime.format()  // Returns "HH:MM"
+}
+
+/**
+ * Gets the current absolute time from game state
+ */
+private fun getCurrentAbsoluteTime(gameState: GameState): GameTime {
+    return GameTime(gameState.timeline.startTime.minutes + gameState.currentTime.minutes)
+}
+
+/**
+ * Calculates clue progress for a character
+ */
+@OptIn(InternalSerializationApi::class)
+private fun getClueProgress(character: Character, gameState: GameState): Pair<Int, Int> {
+    // Get total obtainable clues (character's knownClues that are unlocked)
+    val totalObtainable = character.knownClues
+        .mapNotNull { clueId -> gameState.getClue(clueId) }
+        .count { clue -> clue.isUnlocked(gameState.flags) }
+    
+    // Get collected clues (character's knownClues that player has)
+    val collected = character.knownClues
+        .count { clueId -> gameState.player.collectedClues.contains(clueId) }
+    
+    return Pair(collected, totalObtainable)
+}
+
+@Composable
+private fun ConversationLoadingIndicator() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            tonalElevation = 2.dp,
+            modifier = Modifier.widthIn(max = 280.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp
+                )
+                Text(
+                    text = "Character is thinking...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
     }
 }
