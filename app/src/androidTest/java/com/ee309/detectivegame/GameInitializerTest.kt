@@ -37,7 +37,7 @@ class GameInitializerTest {
 
     @OptIn(ExperimentalCoroutinesApi::class, InternalSerializationApi::class)
     @Test
-    fun llm_chain_end_to_end_test() = runBlocking {
+    fun llm1_game_initializer_test() = runBlocking {
         // --- Test Keyword ---
         val keyword = "a murder mystery in a futuristic city called 'Neo-Alexandria'"
 

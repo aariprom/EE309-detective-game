@@ -18,8 +18,12 @@ sealed class LLMTask (
         systemPrompt = LLMPrompt.IntroGenerator.SYSTEM_PROMPT,
         schema = LLMSchema.IntroGenerator.SCHEMA
     )
-    // Todo: Implement followings
-
     // LLM 3: Dialogue Generator
+    object DialogueGenerator : LLMTask(
+        model = "solar-pro2",
+        systemPrompt = LLMPrompt.DialogueGenerator.SYSTEM_PROMPT,
+        schema = LLMSchema.DialogueGenerator.SCHEMA
+    )
+
     // LLM 4: Description Generator
 }

@@ -5,7 +5,7 @@ object LLMSchema {
 
     // currentTime is not set here
     // player.name, collectedClues, flags are not set here
-    // character.knownClues, mentalState, hidden, items are not set here
+    // character.mentalState, hidden, items are not set here (knownClues is now set)
     // place.hidden is not set here
 
     object GameInitializer {
@@ -85,9 +85,16 @@ object LLMSchema {
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "knownClues": {
+                          "type": "array",
+                          "description": "List of clue IDs that this character knows about and can reveal through conversation. Characters should know clues related to their role, location, or involvement in the case.",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
-                      "required": ["id", "name", "description", "initialLocation", "isCriminal", "unlockConditions"]
+                      "required": ["id", "name", "description", "initialLocation", "isCriminal", "unlockConditions", "knownClues"]
                     }
                   },
                   "places": {
@@ -307,9 +314,47 @@ object LLMSchema {
               }
             }
         """.trimIndent()
-
-        // LLM 3: Dialogue Generator
-        // LLM 4: Description Generator
     }
+
+    // LLM 3: Dialogue Generator
+    object DialogueGenerator {
+        val SCHEMA = """
+            {
+              "name": "dialogue",
+              "strict": true,
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "dialogue": {
+                    "type": "string",
+                    "description": "The character's response dialogue text. Should be natural conversation, 1-6 sentences typically."
+                  },
+                  "newClues": {
+                    "type": "array",
+                    "description": "Optional array of clue IDs that were revealed during this conversation. Only include clues that are in the character's knownClues list.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mentalStateUpdate": {
+                    "type": "string",
+                    "description": "Optional updated mental state of the character after this conversation. Common values: 'Normal', 'Nervous', 'Angry', 'Helpful', 'Suspicious'. Only include if the mental state actually changed."
+                  },
+                  "hints": {
+                    "type": "array",
+                    "description": "Optional array of subtle hints or contradictions that may help the player. Used for game design purposes.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": ["dialogue"]
+              }
+            }
+        """.trimIndent()
+    }
+
+    // LLM 4: Description Generator
 }
 
