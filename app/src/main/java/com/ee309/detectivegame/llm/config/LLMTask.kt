@@ -26,4 +26,16 @@ sealed class LLMTask (
     )
 
     // LLM 4: Description Generator
+    object DescriptionGenerator : LLMTask(
+        model = "solar-pro2",
+        systemPrompt = LLMPrompt.DescriptionGenerator.SYSTEM_PROMPT,
+        schema = LLMSchema.DescriptionGenerator.SCHEMA
+    )
+
+    // LLM 5: Epilogue Generator
+    object EpilogueGenerator : LLMTask(
+        model = "solar-pro2",
+        systemPrompt = LLMPrompt.EpilogueGenerator.SYSTEM_PROMPT,
+        schema = LLMSchema.EpilogueGenerator.SCHEMA
+    )
 }

@@ -34,7 +34,8 @@ data class CharacterDialogueInfo(
     val mentalState: String,
     val knownClues: List<String>,
     val currentLocation: String,
-    val isCriminal: Boolean  // For LLM context, but don't reveal directly in dialogue
+    val isCriminal: Boolean, // For LLM context, but don't reveal directly in dialogue
+    val isVictim: Boolean    // Victims should not converse; used to gate responses
 )
 
 /**
@@ -137,7 +138,8 @@ fun GameState.toDialogueRequest(
             mentalState = character.mentalState,
             knownClues = characterKnownClues,
             currentLocation = character.currentLocation,
-            isCriminal = character.isCriminal
+            isCriminal = character.isCriminal,
+            isVictim = character.isVictim
         ),
         player = PlayerDialogueInfo(
             collectedClues = playerCollectedClues,

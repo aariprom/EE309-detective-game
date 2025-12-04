@@ -22,6 +22,10 @@ import com.ee309.detectivegame.domain.model.ActionTimeCosts
 import com.ee309.detectivegame.domain.model.GameTime
 import com.ee309.detectivegame.llm.model.DialogueRequest
 import com.ee309.detectivegame.llm.model.toDialogueRequest
+import com.ee309.detectivegame.llm.model.DescriptionRequest
+import com.ee309.detectivegame.llm.model.EpilogueRequest
+import com.ee309.detectivegame.llm.model.toDescriptionRequest
+import com.ee309.detectivegame.llm.model.toEpilogueRequest
 import javax.inject.Inject
 
 @HiltViewModel
@@ -47,6 +51,12 @@ class GameViewModel @Inject constructor(
     private val _introShown = MutableStateFlow<Boolean>(false)
     val introShown: StateFlow<Boolean> = _introShown.asStateFlow()
     
+    private val _placeDescriptions = MutableStateFlow<Map<String, String>>(emptyMap())
+    val placeDescriptions: StateFlow<Map<String, String>> = _placeDescriptions.asStateFlow()
+    
+    private val _epilogueText = MutableStateFlow<String?>(null)
+    val epilogueText: StateFlow<String?> = _epilogueText.asStateFlow()
+    
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = false
@@ -64,6 +74,8 @@ class GameViewModel @Inject constructor(
             _conversationHistory.value = emptyMap() // Clear conversation history
             _introText.value = null // Clear intro text
             _introShown.value = false // Reset intro shown flag
+            _placeDescriptions.value = emptyMap()
+            _epilogueText.value = null
             try {
                 // Step 1: Call LLM 1 to generate initial game content
                 val userContent = keywords.ifBlank { "Generate a detective mystery game scenario" }
@@ -96,6 +108,9 @@ class GameViewModel @Inject constructor(
                 
                 // Store game state (but don't show main game yet - need intro first)
                 _gameState.value = gameState
+                
+                // Preload description for starting location (best-effort)
+                fetchPlaceDescription(gameState)
                 
                 // Step 2: Call LLM 2 to generate intro text
                 val introRequest = gameState.toIntroRequest()
@@ -181,6 +196,16 @@ class GameViewModel @Inject constructor(
             // 3. Update state
             updateGameState(newState)
 
+            // 3.5: Fire-and-forget description for current place when location changes or none cached
+            if (action is GameAction.Move || _placeDescriptions.value[newState.player.currentLocation] == null) {
+                fetchPlaceDescription(newState)
+            }
+
+            // 3.6: Generate epilogue on win (best-effort)
+            if (newState.phase == GamePhase.WIN || newState.phase == GamePhase.LOSE) {
+                generateEpilogue(newState)
+            }
+
             // 4. Check win/lose conditions
             checkWinConditions(newState)
         }
@@ -201,6 +226,10 @@ class GameViewModel @Inject constructor(
             val newState = currentState.copy(phase = phase)
             _gameState.value = newState
             _uiState.value = GameUiState.Success(newState)
+
+            if (phase == GamePhase.WIN || phase == GamePhase.LOSE) {
+                generateEpilogue(newState)
+            }
 
         } catch (e: Exception) {
             _uiState.value = GameUiState.Error(e.message ?: "Unknown error")
@@ -293,25 +322,28 @@ class GameViewModel @Inject constructor(
             return state
         }
         
-        // Return early if no question provided (no initial greeting)
-        if (question == null || question.isBlank()) {
-            return state
-        }
-
         // Store previous state for change detection
         val previousCollectedClues = state.player.collectedClues.toSet()
         val previousMentalState = character.mentalState
+        // Prepare question to send to LLM (even if player typed nothing, trigger first-turn response)
+        val effectiveQuestion = if (question.isNullOrBlank()) {
+            "Initial contact / greet the player based on your relationship to the victim."
+        } else {
+            question
+        }
         
         // Calculate absolute time for player's question
         val absoluteTimeNow = GameTime(state.timeline.startTime.minutes + state.currentTime.minutes)
         
-        // Add player's question to conversation history immediately
-        addConversationMessage(characterId, ConversationMessage(
-            text = question,
-            isFromPlayer = true,
-            timestamp = absoluteTimeNow,
-            type = ConversationMessageType.NORMAL
-        ))
+        // Add player's question to conversation history immediately (only if they actually typed something)
+        if (!question.isNullOrBlank()) {
+            addConversationMessage(characterId, ConversationMessage(
+                text = question,
+                isFromPlayer = true,
+                timestamp = absoluteTimeNow,
+                type = ConversationMessageType.NORMAL
+            ))
+        }
 
         // Set loading state
         _dialogueLoading.value = _dialogueLoading.value + (characterId to true)
@@ -323,7 +355,7 @@ class GameViewModel @Inject constructor(
         val dialogueRequest = try {
             state.toDialogueRequest(
                 characterId = characterId,
-                playerQuestion = question,
+                playerQuestion = effectiveQuestion,
                 conversationHistory = history
             )
         } catch (e: Exception) {
@@ -422,9 +454,16 @@ class GameViewModel @Inject constructor(
         // Calculate absolute time for character response
         val absoluteTimeAfter = GameTime(state.timeline.startTime.minutes + timeAfterQuestion.minutes)
         
+        // Compose final dialogue (victim gate)
+        val finalDialogue = if (character.isVictim) {
+            buildVictimDialogue(dialogueData.dialogue, state)
+        } else {
+            dialogueData.dialogue
+        }
+        
         // Add character's response to conversation history
         addConversationMessage(characterId, ConversationMessage(
-            text = dialogueData.dialogue,
+            text = finalDialogue,
             isFromPlayer = false,
             timestamp = absoluteTimeAfter,
             type = ConversationMessageType.NORMAL
@@ -493,7 +532,7 @@ class GameViewModel @Inject constructor(
         }
         
         // Update character's mental state if changed
-        if (dialogueData.mentalStateUpdate != null && previousMentalState != dialogueData.mentalStateUpdate) {
+        if (!character.isVictim && dialogueData.mentalStateUpdate != null && previousMentalState != dialogueData.mentalStateUpdate) {
             val updatedCharacters = newState.characters.map { char ->
                 if (char.id == characterId) {
                     char.copy(mentalState = dialogueData.mentalStateUpdate)
@@ -572,6 +611,29 @@ class GameViewModel @Inject constructor(
         return newState
     }
     
+    /**
+     * Builds the forced victim response.
+     * Always starts with the required prefix and appends a cause-of-death sentence.
+     * Falls back to the crime event description or a generic line if unavailable.
+     */
+    private fun buildVictimDialogue(llmText: String?, state: GameState): String {
+        val trimmed = llmText?.trim().orEmpty()
+        val alreadyPrefixed = trimmed.lowercase().startsWith("[dead men tell no tales")
+        val withoutPrefix = if (alreadyPrefixed) {
+            trimmed.lines().drop(1).joinToString("\n").trim()
+        } else trimmed
+        val causeFromCrime = state.timeline.getCrimeEvents()
+            .firstOrNull()
+            ?.description
+            ?.takeIf { it.isNotBlank() }
+        val causeLine = when {
+            withoutPrefix.isNotBlank() -> withoutPrefix
+            causeFromCrime != null -> causeFromCrime
+            else -> "Cause of death is unknown."
+        }
+        return "[Dead men tell no tales.]\n$causeLine"
+    }
+    
     fun addConversationMessage(characterId: String, message: ConversationMessage) {
         val currentHistory = _conversationHistory.value
         val characterHistory = currentHistory[characterId] ?: emptyList()
@@ -597,5 +659,66 @@ class GameViewModel @Inject constructor(
     fun getConversationHistory(characterId: String): List<ConversationMessage> {
         return _conversationHistory.value[characterId] ?: emptyList()
     }
+
+    @OptIn(InternalSerializationApi::class)
+    private fun fetchPlaceDescription(state: GameState) {
+        val placeId = state.player.currentLocation
+        if (placeId.isBlank()) return
+        if (_placeDescriptions.value.containsKey(placeId)) return
+
+        viewModelScope.launch {
+            val request = state.toDescriptionRequest() ?: return@launch
+            val requestJson = json.encodeToString(DescriptionRequest.serializer(), request)
+            val descriptionText = try {
+                val response = llmRepository.callUpstage(
+                    task = LLMTask.DescriptionGenerator,
+                    userContent = requestJson,
+                    maxTokens = 800
+                )
+                when (val result = LLMResponseProcessor.DescriptionGenerator.process(response)) {
+                    is LLMResponseProcessor.ProcessingResult.Success -> result.data
+                    is LLMResponseProcessor.ProcessingResult.Failure -> state.getCurrentLocation()?.description.orEmpty()
+                }
+            } catch (e: Exception) {
+                state.getCurrentLocation()?.description.orEmpty()
+            }
+
+            if (descriptionText.isNotBlank()) {
+                _placeDescriptions.value = _placeDescriptions.value + (placeId to descriptionText)
+            }
+        }
+    }
+
+    @OptIn(InternalSerializationApi::class)
+    private fun generateEpilogue(state: GameState) {
+        if (_epilogueText.value != null) return
+
+        viewModelScope.launch {
+            val request = state.toEpilogueRequest()
+            val requestJson = json.encodeToString(EpilogueRequest.serializer(), request)
+            val epilogue = try {
+                val response = llmRepository.callUpstage(
+                    task = LLMTask.EpilogueGenerator,
+                    userContent = requestJson,
+                    maxTokens = 1200
+                )
+                when (val result = LLMResponseProcessor.EpilogueGenerator.process(response)) {
+                    is LLMResponseProcessor.ProcessingResult.Success -> result.data
+                    is LLMResponseProcessor.ProcessingResult.Failure -> defaultEpilogue(state)
+                }
+            } catch (e: Exception) {
+                defaultEpilogue(state)
+            }
+
+            _epilogueText.value = epilogue
+        }
+    }
+
+    private fun defaultEpilogue(state: GameState): String {
+        val criminal = state.characters.find { it.isCriminal }?.name ?: "the culprit"
+        val victim = state.characters.find { it.isVictim }?.name ?: "the victim"
+        return "The case closes with $criminal brought to justice and $victim finally at peace."
+    }
+
 }
 
