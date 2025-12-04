@@ -346,7 +346,7 @@ app/src/main/java/com/ee309/detectivegame/
 │   └── state/          # UI state classes
 └── llm/
     ├── client/         # LLM API client (Retrofit)
-    ├── generators/     # LLM 1-5 generators
+    ├── generators/     # LLM 1-4 generators
     └── cache/          # Response cache
 ```
 

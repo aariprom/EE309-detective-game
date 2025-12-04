@@ -512,7 +512,7 @@ data class GameState(
     /**
      * Processes a list of timeline events and applies their effects to the game state.
      * This is a basic implementation that handles common event types.
-     * Complex event processing may require LLM 5 (Component Updater) for dynamic updates.
+     * Complex event processing is handled directly in the game logic.
      * 
      * @param events The list of TimelineEvents to process.
      * @return A new GameState with event effects applied.

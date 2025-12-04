@@ -269,7 +269,7 @@ app/src/main/java/com/ee309/detectivegame/
 │   └── components/   # Reusable components
 ├── llm/              # LLM integration
 │   ├── client/       # API client
-│   ├── generators/   # LLM 1-5 generators
+│   ├── generators/   # LLM 1-4 generators
 │   ├── cache/        # Response cache
 │   └── parsers/      # Response parsers
 └── di/               # Dependency injection modules

@@ -4,7 +4,7 @@ object LLMPrompt {
 
     // Todo: Maybe place LLM 0 which generates the scenario in plain text
     // Then LLM 1 gets {system_prompt, user_prompt={response of LLM 0}, response_format}
-    // Try LLM 1 ~ LLM 5 version first and later try it
+    // Try LLM 1 ~ LLM 4 version first and later try it
 
     // LLM 1: Game Initialize
     object GameInitializer {

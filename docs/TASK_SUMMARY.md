@@ -5,7 +5,7 @@
 The project uses a **Hybrid LLM Architecture**:
 - **LLM 1 (Initializer)**: Generates complete game structure upfront (characters, places, clues, timeline)
 - **LLM 2 (Intro Generator)**: Generates introduction text before game starts
-- **LLM 3-6 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions, actions, updates)
+- **LLM 3-4 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions)
 - **Caching**: Cache generated content to improve performance and reduce costs
 
 See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture documentation.
@@ -17,7 +17,7 @@ See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture docum
 | Module | Priority | Difficulty | Main Components |
 |--------|----------|------------|----------------|
 | **1. Core Game Engine & State Management** | HIGH | MEDIUM | State models, Time system, Game flow, Validation |
-| **2. LLM Integration Layer (Hybrid)** | HIGH | MEDIUM-HIGH | API client, LLM 1-5, Caching, Clue extraction |
+| **2. LLM Integration Layer (Hybrid)** | HIGH | MEDIUM-HIGH | API client, LLM 1-4, Caching, Clue extraction |
 | **3. Game Content System** | HIGH | MEDIUM | Characters, Places, Clues, Timeline, Flags |
 | **4. Android UI/UX Components** | HIGH | MEDIUM | Game screens, Action UI, Conversation UI, Configuration |
 | **5. Game Logic & Validation** | HIGH | MEDIUM-HIGH | Action handlers, Timeline processing, Win/lose conditions |
@@ -44,9 +44,7 @@ See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture docum
 | 2.3 LLM 2: Intro Generator | HIGH | MEDIUM | ✅ POSSIBLE | 2.1, 2.2 |
 | 2.4 LLM 3: Dialogue Generator | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 2.1, 3.1, 2.8 |
 | 2.5 LLM 4: Description Generator | MEDIUM | MEDIUM | ✅ POSSIBLE | 2.1, 2.8 |
-| 2.6 LLM 5: Action Handler | MEDIUM | HIGH | ⚠️ CHALLENGING | 2.1, 1.4 |
-| 2.7 LLM 6: Component Updater | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 2.1, 3.1, 3.2, 3.3, 2.8 |
-| 2.7 Clue Extraction System | MEDIUM | MEDIUM-HIGH | ⚠️ CHALLENGING | 2.1, 3.3 |
+| 2.6 Clue Extraction System | MEDIUM | MEDIUM-HIGH | ⚠️ CHALLENGING | 2.1, 3.3 |
 | 2.8 LLM Response Caching System | MEDIUM | MEDIUM | ✅ POSSIBLE | 2.1 |
 
 ### Module 3: Game Content System
@@ -112,10 +110,10 @@ To build a playable game, these tasks must be completed in order:
    - **2.8 LLM Response Caching System** - Performance optimization
 
 3. **Runtime LLMs & Game Logic** (Week 3)
-   - **2.3 LLM 2: Dialogue Generator** - Lazy loading for conversations
-   - **2.4 LLM 3: Description Generator** - Lazy loading for descriptions
-   - **2.6 LLM 5: Component Updater** - Timeline-based updates
-   - 2.7 Clue Extraction System
+   - **2.3 LLM 2: Intro Generator** - Introduction text generation
+   - **2.4 LLM 3: Dialogue Generator** - Lazy loading for conversations
+   - **2.5 LLM 4: Description Generator** - Lazy loading for descriptions
+   - 2.6 Clue Extraction System
    - 1.3 Game Flow Controller
    - 5.1, 5.2, 5.3, 5.4 Core Action Handlers
    - 5.6 Timeline Event Processor
@@ -130,7 +128,6 @@ To build a playable game, these tasks must be completed in order:
    - 4.6 Conversation UI (Integration with LLM 3)
 
 5. **Advanced Features** (Week 5+)
-   - **2.6 LLM 5: Action Handler** - Free action system
    - 4.7 Game Configuration
    - 1.4, 5.5 Free Action System (if time permits)
 
@@ -140,12 +137,11 @@ To build a playable game, these tasks must be completed in order:
 
 ### High Risk (Requires Careful Planning)
 - **Action Validation (1.4, 5.5)**: Balancing flexibility with game integrity
-- **LLM 5: Action Handler (2.6)**: Balancing flexibility with game integrity
 - **Clue Extraction (2.7)**: Ensuring reliable structured output from LLM
 - **Timeline Event Processing (5.6)**: Managing complex state updates
 
 ### Medium Risk
-- **LLM Response Quality**: Ensuring consistent, game-appropriate responses across LLM 2-6
+- **LLM Response Quality**: Ensuring consistent, game-appropriate responses across LLM 2-4
 - **Caching Strategy (2.8)**: Managing cache invalidation correctly
 - **Component Updates (2.6, 5.8)**: Maintaining state consistency across updates
 - **Free Action System**: Preventing exploits while maintaining fun

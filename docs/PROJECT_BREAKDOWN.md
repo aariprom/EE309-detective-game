@@ -56,7 +56,7 @@ This document breaks down the Android detective game project into manageable mod
 **Architecture Overview**:
 - **LLM 1 (Initializer)**: Generates complete game structure upfront (characters, places, clues, timeline)
 - **LLM 2 (Intro Generator)**: Generates introduction text before game starts
-- **LLM 3-6 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions, actions, updates)
+- **LLM 3-4 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions)
 - **Caching**: Cache generated content to improve performance and reduce costs
 
 ### 2.1 LLM API Client
@@ -122,32 +122,7 @@ This document breaks down the Android detective game project into manageable mod
   - Epilogue generation for game endings
   - **Caching**: Cache descriptions for same place/character + same time state
 
-### 2.6 LLM 5: Action Handler (Lazy Loading)
-- **Priority**: MEDIUM
-- **Difficulty**: HIGH
-- **Feasibility**: ⚠️ CHALLENGING (Requires strong validation)
-- **Description**:
-  - **Handle free-form player actions on-demand**
-  - Input: action description, current game state, location, player tools, current time
-  - Output: action validation (feasible/not feasible), action outcome, state changes
-  - Strong validation to prevent game-breaking actions while maintaining flexibility
-  - Generate narrative for action outcomes
-  - **Caching**: Rarely (actions are usually unique), but cache common actions
-
-### 2.7 LLM 6: Component Updater (Lazy Loading)
-- **Priority**: HIGH (Critical Path)
-- **Difficulty**: MEDIUM-HIGH
-- **Feasibility**: ✅ POSSIBLE
-- **Description**:
-  - **Update game components on-demand** based on timeline events and player actions
-  - Input: timeline event, current game state, affected components
-  - Output: updated component states, narrative for event
-  - Regenerate character states (mental_state, known_clues, location)
-  - Update place states (available_clues, current_characters)
-  - Update clue availability based on unlock_conditions
-  - **Caching**: Cache updates for same event + same state
-
-### 2.7 Clue Extraction System
+### 2.6 Clue Extraction System
 - **Priority**: MEDIUM
 - **Difficulty**: MEDIUM-HIGH
 - **Feasibility**: ⚠️ CHALLENGING (Requires structured output parsing)
@@ -384,7 +359,7 @@ This document breaks down the Android detective game project into manageable mod
 - **Feasibility**: ⚠️ CHALLENGING (Requires strong validation)
 - **Description**:
   - Handle free-form player actions
-  - Trigger **LLM 4 (Action Handler)** for validation and outcome
+  - Action validation handled by game logic
   - LLM-based action validation (feasible/not feasible)
   - Strong validation to prevent game-breaking actions
   - Execute valid actions (e.g., breaking locked door, hiding)
@@ -398,9 +373,8 @@ This document breaks down the Android detective game project into manageable mod
 - **Description**:
   - Process timeline events based on current time
   - Trigger character actions (evidence destruction, movement)
-  - Call **LLM 6 (Component Updater)** to update component states
-  - Check cache before calling LLM (same event + same state)
-  - Generate narrative for timeline events (via LLM 6)
+  - Update component states directly via game logic
+  - Generate narrative for timeline events
 
 ### 5.7 Win/Lose Condition Checker
 - **Priority**: HIGH (Critical Path)
@@ -420,8 +394,7 @@ This document breaks down the Android detective game project into manageable mod
 - **Feasibility**: ✅ POSSIBLE
 - **Description**:
   - Update components after each action/time unit
-  - Coordinate with **LLM 6 (Component Updater)** for timeline-based updates
-  - Apply timeline events to components (via LLM 6)
+  - Apply timeline events to components directly via game logic
   - Update character states, place states, clue availability
   - Handle unlock conditions
   - Cache invalidation when components are updated
@@ -432,7 +405,7 @@ This document breaks down the Android detective game project into manageable mod
 
 ### Critical Path (Must Complete)
 1. Core Game Engine & State Management (1.1, 1.2, 1.3)
-2. LLM Integration Layer (2.1, 2.2, 2.3, 2.6, 2.8)
+2. LLM Integration Layer (2.1, 2.2, 2.3, 2.4, 2.5, 2.8)
 3. Game Content System (3.1, 3.2, 3.3, 3.4)
 4. Android UI - Main Components (4.1, 4.2, 4.3, 4.5, 4.6)
 5. Game Logic - Core Actions (5.1, 5.2, 5.3, 5.4, 5.6, 5.7, 5.8)
@@ -442,7 +415,6 @@ This document breaks down the Android detective game project into manageable mod
 - LLM 2: Intro Generator (2.3)
 - LLM 4: Description Generator (2.5)
 - Clue Extraction System (2.8)
-- LLM 5: Action Handler (2.6)
 - Flag System (3.5)
 - Free Action Input UI (4.4)
 - Game Start Configuration (4.7)
@@ -463,9 +435,8 @@ This document breaks down the Android detective game project into manageable mod
 Most tasks are feasible with standard Android development and LLM API integration.
 
 ### ⚠️ CHALLENGING
-- **Action Validation (1.4, 5.5)**: Requires sophisticated LLM prompting and validation logic to prevent game-breaking actions while maintaining flexibility.
-- **Clue Extraction (2.7)**: Requires structured output from LLM or robust parsing. May need to use function calling or JSON mode.
-- **LLM 5: Action Handler (2.6)**: Balancing flexibility with game integrity requires careful prompt engineering.
+- **Action Validation (1.4, 5.5)**: Requires sophisticated validation logic to prevent game-breaking actions while maintaining flexibility.
+- **Clue Extraction (2.6)**: Requires structured output from LLM or robust parsing. May need to use function calling or JSON mode.
 
 ### 🔧 Recommended Tech Stack
 
@@ -502,7 +473,6 @@ See **[TECH_STACK.md](./TECH_STACK.md)** for comprehensive tech stack recommenda
 
 ### Phase 3: Game Logic (Weeks 3-4)
 - Core action handlers (5.1, 5.2, 5.3, 5.4)
-- **LLM 6: Component Updater** (2.7) - Timeline-based updates
 - Timeline event processing (5.6)
 - Win/lose conditions (5.7)
 - Component update logic (5.8)
@@ -515,7 +485,6 @@ See **[TECH_STACK.md](./TECH_STACK.md)** for comprehensive tech stack recommenda
 - Basic navigation
 
 ### Phase 5: Advanced Features (Weeks 5-6)
-- **LLM 4: Action Handler** (2.5) - Free action system
 - Free Action Input UI (4.4)
 - Action Validation System (1.4)
 - Game Start Configuration (4.7)

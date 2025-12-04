@@ -159,67 +159,6 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 
 ---
 
-#### LLM 5: Action Handler
-
-**When**: Player performs free-form action
-
-**Purpose**: Validate and execute player's custom actions
-
-**Input**:
-- Action description (player's text input)
-- Current game state
-- Current location
-- Player tools/items
-- Current game time
-
-**Output**:
-- Action validation (feasible/not feasible)
-- Action outcome description
-- State changes (if action succeeds)
-- Time cost (if applicable)
-
-**Cache Key**: `action_hash + game_state_hash` (rarely cached, actions are usually unique)
-
-**Cache Strategy**:
-- Rarely cache (actions are usually unique)
-- Cache common actions (e.g., "look around", "check door")
-- Store in-memory only (not persistent)
-
-**Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per action
-
----
-
-#### LLM 6: Component Updater
-
-**When**: Timeline events trigger or component state needs update
-
-**Purpose**: Update game components based on timeline events and player actions
-
-**Input**:
-- Timeline event data
-- Current game state
-- Affected components (characters, places, clues)
-- Player's recent actions
-
-**Output**:
-- Updated component states:
-  - Character states (mental_state, known_clues, location)
-  - Place states (available_clues, current_characters)
-  - Clue availability (based on unlock_conditions)
-- Narrative for event
-- State change descriptions
-
-**Cache Key**: `event_id + game_state_hash`
-
-**Cache Strategy**:
-- Cache for same event + same state
-- Invalidate when game state changes significantly
-- Store in-memory for session, persistent for save games
-
-**Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per event
-
----
-
 ## Caching Strategy
 
 ### What to Cache
@@ -227,8 +166,6 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 - **Intro** (LLM 2): Introduction text (cached per game)
 - **Dialogue** (LLM 3): Character conversations
 - **Descriptions** (LLM 4): Place/character descriptions
-- **Action Outcomes** (LLM 5): Common actions (rarely)
-- **Component Updates** (LLM 6): Timeline event outcomes
 
 ### Cache Key Structure
 
@@ -236,8 +173,6 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 LLM 2: "intro:{game_state_hash}" (cached per game)
 LLM 3: "dialogue:{character_id}:{clues_hash}:{time}:{topic}"
 LLM 4: "desc:{place_id}:{time}:{clues_hash}:{events_hash}"
-LLM 5: "action:{action_hash}:{state_hash}"
-LLM 6: "update:{event_id}:{state_hash}"
 ```
 
 ### Cache Storage
@@ -269,7 +204,7 @@ LLM 6: "update:{event_id}:{state_hash}"
 
 - **LLM 1 (Initializer)**: Use larger model (Solar Pro) for complete structure generation
 - **LLM 2 (Intro Generator)**: Use larger model (Solar Pro) for quality intro text
-- **LLM 3-6 (Runtime)**: Use faster/cheaper model (Solar Plus) for runtime generation
+- **LLM 3-4 (Runtime)**: Use faster/cheaper model (Solar Plus) for runtime generation
 - **Consistency**: Using same model family helps maintain consistency
 
 **Alternatives**: OpenAI GPT-3.5-turbo/GPT-4, Anthropic Claude (fallback)
@@ -295,16 +230,6 @@ LLM 6: "update:{event_id}:{state_hash}"
 - **Focus**: Visual detail, contextual relevance, atmosphere
 - **Format**: JSON with description and found clues
 - **Key**: Reflect time, events, and player's knowledge
-
-#### LLM 5: Action Handler
-- **Focus**: Validation logic, game state awareness, creative outcomes
-- **Format**: JSON with validation, outcome, state changes
-- **Key**: Balance flexibility with game integrity
-
-#### LLM 6: Component Updater
-- **Focus**: State consistency, narrative coherence, logical updates
-- **Format**: JSON with updated components and narrative
-- **Key**: Maintain game logic, reflect timeline events
 
 ### Error Handling
 
@@ -340,8 +265,8 @@ LLM 6: "update:{event_id}:{state_hash}"
 **Intro Generation (LLM 2)**:
 - ~2k tokens = ~$0.01-0.02 per game
 
-**Runtime Generation (LLM 3-6)**:
-- ~30-50 calls × ~2k tokens each = ~$0.30-1.00
+**Runtime Generation (LLM 3-4)**:
+- ~20-40 calls × ~2k tokens each = ~$0.20-0.80
 - Caching reduces actual calls by ~30-50%
 
 **Total Estimated Cost**: ~$0.50-1.40 per game session
@@ -354,55 +279,44 @@ LLM 6: "update:{event_id}:{state_hash}"
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ Initial Game Setup (LLM 1)                      │
-│ - User provides game content/keywords            │
-│ - Generate complete game structure               │
-│ - All characters, places, clues, timeline        │
-│ - Store in game state                            │
-│ - Validate structure completeness                │
+│ LLM 1: Initial Game Setup                       │
+│ - User provides game content/keywords           │
+│ - Generate complete game structure              │
+│ - All characters, places, clues, timeline       │
+│ - Store in game state                           │
+│ - Validate structure completeness               │
 └─────────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────┐
-│ Runtime Gameplay                                 │
-│                                                  │
-│  ┌──────────────────────────────────────────┐  │
-│  │ LLM 2: Dialogue Generator                 │  │
+│ LLM 2: Intro Generator                          │
+│ - Read GameState and parse it                   │
+│ - Pass some information needed to LLM           │
+│ - Generate detailed introduction                │
+│ - Show it to user                               │
+└─────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────┐
+│ Runtime Gameplay                                │
+│                                                 │
+│  ┌───────────────────────────────────────────┐  │
+│  │ LLM 3: Dialogue Generator                 │  │
 │  │ - Check cache first                       │  │
 │  │ - Called when player questions character  │  │
 │  │ - Input: character data, player clues,    │  │
-│  │          context, player question          │  │
+│  │          context, player question         │  │
 │  │ - Output: dialogue response, new clues    │  │
 │  │ - Cache result                            │  │
-│  └──────────────────────────────────────────┘  │
-│                                                  │
-│  ┌──────────────────────────────────────────┐  │
-│  │ LLM 3: Description Generator              │  │
+│  └───────────────────────────────────────────┘  │
+│                                                 │
+│  ┌───────────────────────────────────────────┐  │
+│  │ LLM 4: Description Generator              │  │
 │  │ - Check cache first                       │  │
 │  │ - Called when player investigates place   │  │
-│  │ - Input: place data, current time,       │  │
+│  │ - Input: place data, current time,        │  │
 │  │          timeline events, player clues    │  │
 │  │ - Output: place description, clues found  │  │
 │  │ - Cache result                            │  │
-│  └──────────────────────────────────────────┘  │
-│                                                  │
-│  ┌──────────────────────────────────────────┐  │
-│  │ LLM 5: Action Handler                    │  │
-│  │ - Called when player performs free action│  │
-│  │ - Input: action description, game state,  │  │
-│  │          current location, player tools   │  │
-│  │ - Output: action validation, outcome,     │  │
-│  │          state changes                    │  │
-│  │ - Cache rarely (actions are unique)     │  │
-│  └──────────────────────────────────────────┘  │
-│                                                  │
-│  ┌──────────────────────────────────────────┐  │
-│  │ LLM 6: Component Updater                 │  │
-│  │ - Check cache first                       │  │
-│  │ - Called when timeline event triggers    │  │
-│  │ - Input: timeline event, current state   │  │
-│  │ - Output: updated components, narrative  │  │
-│  │ - Cache result                            │  │
-│  └──────────────────────────────────────────┘  │
+│  └───────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────┘
 ```
 
