@@ -32,7 +32,14 @@ fun GameOverScreen(
     val subtitle = if (isWin) {
         "Congratulations! You solved the mystery."
     } else {
-        "You failed to solve the mystery in time."
+        when (gameState.lossReason) {
+            com.ee309.detectivegame.domain.model.LossReason.TIMEOUT -> 
+                "Time ran out before you could solve the mystery."
+            com.ee309.detectivegame.domain.model.LossReason.FALSE_ACCUSATION -> 
+                "You accused the wrong person. The real criminal remains free."
+            null -> 
+                "You failed to solve the mystery."
+        }
     }
     val icon = if (isWin) Icons.Default.Star else Icons.Default.Close
     

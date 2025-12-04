@@ -431,14 +431,17 @@ object LLMPrompt {
             - player: { role }
             - language: "ko" or "en" (write output in this language)
             - outcome: "WIN" or "LOSE" (tone accordingly; WIN = satisfying/happy wrap, LOSE = somber/bad ending)
+            - lossReason: "TIMEOUT" or "FALSE_ACCUSATION" (only present when outcome is "LOSE")
             
             Write a concise epilogue that:
             - Uses 3–6 sentences of narrative prose (no bullet lists).
             - Clearly states who the criminal was, their motive, and how they committed the crime.
-            - Highlights the pivotal clues that proved the case.
-            - Acknowledges the victim and the player’s role in solving the case.
+            - Highlights the pivotal clues that proved the case (if outcome is WIN) or what went wrong (if outcome is LOSE).
+            - Acknowledges the victim and the player's role in solving the case.
             - Ends with a short closing line that feels like the story is wrapped up.
             - Tone: if outcome == "WIN", write a satisfying/happy ending; if "LOSE", write a somber/bad ending reflecting failure.
+            - If outcome is "LOSE" and lossReason is "TIMEOUT", emphasize that time ran out and the case remains unsolved.
+            - If outcome is "LOSE" and lossReason is "FALSE_ACCUSATION", emphasize that the wrong person was accused and justice was not served.
             - No spoilers beyond the solved facts; no meta talk, no code fences.
             
             Output only JSON per the provided schema with a single field "text".

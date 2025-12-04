@@ -27,13 +27,13 @@ import kotlinx.serialization.InternalSerializationApi
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationScreen(
+    modifier: Modifier = Modifier,
     character: Character,
     messages: List<ConversationMessage>,
     gameState: GameState,
     isLoading: Boolean = false,
     onBack: () -> Unit,
     onSendMessage: (String) -> Unit,
-    modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }

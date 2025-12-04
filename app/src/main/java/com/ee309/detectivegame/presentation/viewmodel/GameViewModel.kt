@@ -6,6 +6,7 @@ import com.ee309.detectivegame.domain.model.GameState
 import com.ee309.detectivegame.presentation.state.GameUiState
 import com.ee309.detectivegame.domain.model.GameAction
 import com.ee309.detectivegame.domain.model.GamePhase
+import com.ee309.detectivegame.domain.model.LossReason
 import com.ee309.detectivegame.llm.config.LLMTask
 import com.ee309.detectivegame.llm.config.LLMResponseProcessor
 import com.ee309.detectivegame.llm.data.LLMRepository
@@ -212,7 +213,7 @@ class GameViewModel @Inject constructor(
     }
 
     @OptIn(InternalSerializationApi::class)
-    fun transitionToPhase(phase: GamePhase) {
+    fun transitionToPhase(phase: GamePhase, lossReason: LossReason? = null) {
         try {
             val currentState = _gameState.value?: throw Exception("Game state is null")
             val currentPhase = currentState.phase
@@ -223,7 +224,12 @@ class GameViewModel @Inject constructor(
             }
 
             // actual transition logic
-            val newState = currentState.copy(phase = phase)
+            // Set lossReason only when transitioning to LOSE
+            val newState = if (phase == GamePhase.LOSE && lossReason != null) {
+                currentState.copy(phase = phase, lossReason = lossReason)
+            } else {
+                currentState.copy(phase = phase, lossReason = null)
+            }
             _gameState.value = newState
             _uiState.value = GameUiState.Success(newState)
 
@@ -245,8 +251,7 @@ class GameViewModel @Inject constructor(
         // currentTime is relative to startTime, endTime is absolute
         val currentAbsolute = state.timeline.startTime.minutes + state.currentTime.minutes
         if (currentAbsolute >= state.timeline.endTime.minutes) {
-            // TODO: how to show that this is lose due to time limit?
-            transitionToPhase(GamePhase.LOSE)
+            transitionToPhase(GamePhase.LOSE, LossReason.TIMEOUT)
             return
         }
     }
@@ -602,10 +607,10 @@ class GameViewModel @Inject constructor(
 
         // Transition to win/lose phase
         if (isCorrect) {
-            newState = newState.copy(phase = GamePhase.WIN)
+            newState = newState.copy(phase = GamePhase.WIN, lossReason = null)
         } else {
             // TODO: Maybe give more chances for wrong accusation
-            newState = newState.copy(phase = GamePhase.LOSE)
+            newState = newState.copy(phase = GamePhase.LOSE, lossReason = LossReason.FALSE_ACCUSATION)
         }
 
         return newState
