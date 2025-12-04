@@ -68,11 +68,16 @@ private fun CharacterSelectionItem(
     character: Character,
     onClick: () -> Unit
 ) {
+    val isVictim = character.isVictim
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isVictim) {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            }
         )
     ) {
         Row(
@@ -85,13 +90,22 @@ private fun CharacterSelectionItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = character.name,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (isVictim) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
                 )
                 if (character.traits.isNotEmpty()) {
                     Text(
                         text = character.traits.joinToString(", "),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = if (isVictim) {
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        }
                     )
                 }
             }
@@ -111,11 +125,11 @@ fun PlaceSelectionDialog(
     title: String = "Select Place",
     filterUnlocked: Boolean = true,
     excludePlaceId: String? = null,
-    flags: Map<String, Boolean> = emptyMap()
+    flags: Map<String, Boolean> = emptyMap(),
+    victimPlaceId: String? = null
 ) {
     val filteredPlaces = places.filter { place ->
-        (!filterUnlocked || place.isUnlocked(flags)) &&
-        (excludePlaceId == null || place.id != excludePlaceId)
+        (!filterUnlocked || place.isUnlocked(flags))
     }
     
     AlertDialog(
@@ -132,11 +146,17 @@ fun PlaceSelectionDialog(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(filteredPlaces) { place ->
+                        val isDisabled = excludePlaceId != null && place.id == excludePlaceId
+                        val isVictimPlace = victimPlaceId != null && victimPlaceId == place.id
                         PlaceSelectionItem(
                             place = place,
+                            isDisabled = isDisabled,
+                            isVictimPlace = isVictimPlace,
                             onClick = {
-                                onPlaceSelected(place)
-                                onDismiss()
+                                if (!isDisabled) {
+                                    onPlaceSelected(place)
+                                    onDismiss()
+                                }
                             }
                         )
                     }
@@ -155,13 +175,20 @@ fun PlaceSelectionDialog(
 @Composable
 private fun PlaceSelectionItem(
     place: Place,
+    isDisabled: Boolean,
+    isVictimPlace: Boolean,
     onClick: () -> Unit
 ) {
     Card(
         onClick = onClick,
+        enabled = !isDisabled,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = when {
+                isDisabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                isVictimPlace -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
         )
     ) {
         Row(
@@ -173,7 +200,12 @@ private fun PlaceSelectionItem(
         ) {
             Text(
                 text = place.name,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                color = when {
+                    isDisabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    isVictimPlace -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
             )
         }
     }

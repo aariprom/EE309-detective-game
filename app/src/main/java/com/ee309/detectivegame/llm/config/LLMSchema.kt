@@ -77,11 +77,19 @@ object LLMSchema {
                         },
                         "isCriminal": {
                           "type": "boolean",
-                          "description": "True if this character is the criminal; false otherwise."
-                        },
-                        "unlockConditions": {
-                          "type": "array",
-                          "description": "List of flag IDs required.",
+                        "description": "True if this character is the criminal; false otherwise."
+                      },
+                      "isVictim": {
+                        "type": "boolean",
+                        "description": "True if this character is the victim; exactly one victim, cannot be criminal."
+                      },
+                      "hidden": {
+                        "type": "boolean",
+                        "description": "Optional: hidden character (max two total, victim must be false). Defaults to false if omitted."
+                      },
+                      "unlockConditions": {
+                        "type": "array",
+                        "description": "List of flag IDs required.",
                           "items": {
                             "type": "string"
                           }
@@ -92,9 +100,13 @@ object LLMSchema {
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "alibi": {
+                          "type": "string",
+                          "description": "Natural language alibi up to game start, including time ranges and actions. Example: '18:00~18:20 at office preparing slides; 18:20 moved to cafe; 18:30~18:50 at cafe with barista.'"
                         }
                       },
-                      "required": ["id", "name", "description", "initialLocation", "isCriminal", "unlockConditions", "knownClues"]
+                      "required": ["id", "name", "description", "initialLocation", "isCriminal", "unlockConditions", "knownClues", "alibi"]
                     }
                   },
                   "places": {
@@ -356,5 +368,45 @@ object LLMSchema {
     }
 
     // LLM 4: Description Generator
+    object DescriptionGenerator {
+        val SCHEMA = """
+            {
+              "name": "description",
+              "strict": true,
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "Short scene description for the current place (2-4 sentences)."
+                  }
+                },
+                "required": ["text"]
+              }
+            }
+        """.trimIndent()
+    }
+
+    // LLM 5: Epilogue Generator
+    object EpilogueGenerator {
+        val SCHEMA = """
+            {
+              "name": "epilogue",
+              "strict": true,
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "Narrative epilogue text wrapping up the case."
+                  }
+                },
+                "required": ["text"]
+              }
+            }
+        """.trimIndent()
+    }
 }
 

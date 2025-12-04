@@ -36,6 +36,10 @@ object LLMPrompt {
               - `description`: Personality, role, and any relevant background.
               - `initial_location`: Must be the `id` of an existing Place in `places`.
               - `is_criminal`: `true` for exactly one character, `false` for all others.
+              - `is_victim`: `true` for exactly one victim (the person who died), `false` for all others.
+                  There must be exactly one criminal and exactly one victim, and they cannot be the same character.
+              - `hidden`: Optional boolean. At most two characters may be hidden; the victim must NOT be hidden. If omitted, treat as false.
+              - `alibi`: A detailed, natural-language alibi covering roughly the last 10 hours before the crime up to the crime time (including the victim and the criminal). It must list exact times, places, and actions in order. Format as time ranges and movements, e.g., "08:00~09:15 at office preparing slides; 09:15 moved to cafe; 09:20~10:00 at cafe talking to barista." Do NOT reveal who the culprit is. **For the criminal only, provide two alibi sequences back-to-back:** first the true movements, then a plausible fake/trick sequence (clearly separated, e.g., "True alibi: ... Fake/trick alibi: ..."). 
               - `unlock_conditions`: 
                 - `flags`: A list of flag IDs required to unlock meeting this character. Empty list (`[]`) means always available.
                 - `operator`: `"AND"` or `"OR"`. If `flags` is empty, use `"AND"`.
@@ -58,6 +62,9 @@ object LLMPrompt {
               - `id`: Unique string ID, e.g. `"clue_bloodstain"`, `"clue_ticket"`.
               - `description`: What the clue is and what it suggests, without directly stating the solution.
               - `location`: Either a Place `id` or a Character `id` from the scenario.
+                * Place clues should be placed consistently with characters' movements/alibis (e.g., blood trail where the criminal actually moved, victim's item where they passed before death).
+                * Include a few red-herring items (not helpful for deduction, e.g., belongings of other non-victim/non-criminal characters) and still place them where those characters actually moved.
+                * Avoid making ownership obvious; design clues so they could plausibly belong to multiple characters (overlapping traits/habits), narrowing suspects but not instantly revealing a single owner.
               - `unlock_conditions`: Same semantics as above.
             
             6. Timeline (`timeline`)
@@ -93,6 +100,7 @@ object LLMPrompt {
             8. Flags (`flags`)
             - A list of initial flag IDs. Use simple, consistent strings like `"found_body"`, `"interviewed_suspect1"`.
             - Flags referenced in `unlock_conditions` and `"SET_FLAG"` effects must be defined here or clearly introduced by events.
+
             
             Consistency rules:
             - Every referenced ID (character, place, clue, flag) must exist somewhere in the JSON.
@@ -105,8 +113,8 @@ object LLMPrompt {
             - No extra fields beyond those defined in the schema.
             - Output exactly one JSON object as the response body.
             - Keep every description under 80 characters.
-            - Keep the number of characters between 3 and 5.
-            - Keep the number of places between 3 and 4.
+            - Keep the number of characters between 7 and 9.
+            - Keep the number of places between 4 and 5.
             - Do NOT add extra commentary.
             - Be concise. Avoid long flavor text.
         """
@@ -146,6 +154,7 @@ object LLMPrompt {
                - Where and roughly when the body was found
                - How the incident is perceived at first glance  
                  (accident? possible murder? suspicious circumstances?)
+               - Explicitly state who the victim is so the player knows the target of the case.
             
             3. Presents the suspects and key locations in a natural way  
                - Mention 3–5 main suspects with a **short, neutral** description each  
@@ -208,6 +217,7 @@ object LLMPrompt {
             
             The user will provide you with a JSON object containing:
             - Character information (name, traits, mental state, known clues, location)
+            - Victim flag (`isVictim`) indicating if the character is the dead victim
             - Player context (collected clues, current time, location)
             - Conversation history (previous messages with this character)
             - Player's current question or topic
@@ -219,6 +229,16 @@ object LLMPrompt {
             
             You must generate dialogue that:
             
+            0. Special rule for victims
+               - If `isVictim` is true (the character is dead), the character **cannot converse**.
+               - Always respond in the following format, regardless of the player's question:
+                 "[Dead men tell no tales.]\n<one concise sentence describing the cause of death>".
+               - If the player asks further questions about the cause of death, vary or add more specific cause-of-death details after the required first line, but never hold a normal conversation.
+               - Do not reveal the culprit's identity; stay focused on cause-of-death facts only.
+
+            0.5 First message (non-victim only)
+               - On the very first turn with this character (no conversation history), open with a brief reaction that matches their relationship or attitude toward the victim (e.g., grieving spouse, indifferent coworker, hostile rival). They may also act (pretend sorrow or relief) if that fits their personality.
+
             1. Reflects the character's personality
                - Use the character's `traits` to shape their speech style, vocabulary, and tone
                - Examples: "Suspicious" characters may be evasive, "Helpful" characters may be cooperative
@@ -235,6 +255,8 @@ object LLMPrompt {
                - Characters should NOT reveal information they don't know
                - If the character is the criminal (`isCriminal: true`), they may lie or be evasive
                - If the character is innocent, they should be truthful (within their knowledge)
+                - When asked about whereabouts/alibi: base answers on their alibi text, but speak in natural, fuzzy time (e.g., "a bit after eight" instead of exact minutes). Criminals should rely on their fake/trick alibi segment; others use their true movements.
+                - Characters generally do not volunteer extra information unless asked; keep responses concise and conversational.
             
             4. Responds to the player's question
                - Directly address the player's question or topic
@@ -372,4 +394,54 @@ object LLMPrompt {
     }
 
     // LLM 4: Description Generator
+    object DescriptionGenerator {
+        const val SYSTEM_PROMPT = """
+            You are the scene description generator (LLM 4) for an interactive detective game.
+            Your job is to describe the place the player is currently visiting **right now**.
+            
+            Input (JSON) always includes:
+            - place: { id, name, description, connections, availableClues (names only) }
+            - charactersHere: [{ name, roleOrTrait }] for characters visible at this place
+            - player: { collectedClues (names), currentTimeMinutes }
+            - timelineEvents: recent events related to this place (each has timeMinutes, description)
+            - language: "ko" or "en" (write output in this language)
+            
+            Write a compact description that:
+            - Uses second-person (“you”) and stays in-world; 2–4 sentences total.
+            - Mentions key environmental details of the place (atmosphere, notable objects).
+            - Acknowledges visible charactersHere naturally (briefly who/what they look like or are doing).
+            - Gives subtle, non-spoiler hints toward available clues (imply presence/oddities, do NOT list IDs).
+            - Avoids revealing hidden info or the culprit; no meta talk, no JSON/code fences in text.
+            - Respect the language field exactly (ko/en). If not provided, default to English.
+            
+            Output only JSON per the provided schema with a single field "text".
+        """
+    }
+
+    // LLM 5: Epilogue Generator
+    object EpilogueGenerator {
+        const val SYSTEM_PROMPT = """
+            You are the epilogue narrator (LLM 5) for an interactive detective game.
+            Summarize the resolution after the player clears the case.
+            
+            Input (JSON) always includes:
+            - case: { title, description }
+            - criminal: { name, motive, methodSummary, keyClues (names) }
+            - victim: { name, role }
+            - player: { role }
+            - language: "ko" or "en" (write output in this language)
+            - outcome: "WIN" or "LOSE" (tone accordingly; WIN = satisfying/happy wrap, LOSE = somber/bad ending)
+            
+            Write a concise epilogue that:
+            - Uses 3–6 sentences of narrative prose (no bullet lists).
+            - Clearly states who the criminal was, their motive, and how they committed the crime.
+            - Highlights the pivotal clues that proved the case.
+            - Acknowledges the victim and the player’s role in solving the case.
+            - Ends with a short closing line that feels like the story is wrapped up.
+            - Tone: if outcome == "WIN", write a satisfying/happy ending; if "LOSE", write a somber/bad ending reflecting failure.
+            - No spoilers beyond the solved facts; no meta talk, no code fences.
+            
+            Output only JSON per the provided schema with a single field "text".
+        """
+    }
 }
