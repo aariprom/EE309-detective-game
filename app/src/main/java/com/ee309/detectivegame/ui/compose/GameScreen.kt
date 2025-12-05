@@ -72,7 +72,7 @@ fun GameScreen(
                         gameState = currentGameState,
                         epilogueText = epilogueText,
                         onRestart = {
-                            viewModel.startNewGame("")
+                            viewModel.resetToStartScreen()
                             conversationCharacterId = null
                         }
                     )

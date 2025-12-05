@@ -69,6 +69,21 @@ class GameViewModel @Inject constructor(
         _uiState.value = GameUiState.Error("")
     }
     
+    /**
+     * Resets the game state to return to the StartScreen where user can input keywords.
+     * This is called when user clicks "Start New Game" from GameOverScreen.
+     */
+    fun resetToStartScreen() {
+        _gameState.value = null
+        _uiState.value = GameUiState.Error("")
+        _conversationHistory.value = emptyMap()
+        _introText.value = null
+        _introShown.value = false
+        _placeDescriptions.value = emptyMap()
+        _epilogueText.value = null
+        _dialogueLoading.value = emptyMap()
+    }
+    
     fun startNewGame(keywords: String) {
         viewModelScope.launch {
             _uiState.value = GameUiState.Loading
