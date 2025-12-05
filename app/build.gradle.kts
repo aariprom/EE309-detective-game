@@ -111,6 +111,7 @@ dependencies {
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.10.0")
 
     // Hilt
     implementation("com.google.dagger:hilt-android:2.57.2")
