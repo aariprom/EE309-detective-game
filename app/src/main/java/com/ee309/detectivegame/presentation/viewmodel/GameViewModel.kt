@@ -1,11 +1,13 @@
 package com.ee309.detectivegame.presentation.viewmodel
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ee309.detectivegame.domain.model.GameState
 import com.ee309.detectivegame.presentation.state.GameUiState
 import com.ee309.detectivegame.domain.model.GameAction
 import com.ee309.detectivegame.domain.model.GamePhase
+import com.ee309.detectivegame.domain.model.LossReason
 import com.ee309.detectivegame.llm.config.LLMTask
 import com.ee309.detectivegame.llm.config.LLMResponseProcessor
 import com.ee309.detectivegame.llm.data.LLMRepository
@@ -16,17 +18,26 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import com.ee309.detectivegame.ui.compose.ConversationMessage
 import com.ee309.detectivegame.ui.compose.ConversationMessageType
 import com.ee309.detectivegame.domain.model.ActionTimeCosts
 import com.ee309.detectivegame.domain.model.GameTime
 import com.ee309.detectivegame.llm.model.DialogueRequest
 import com.ee309.detectivegame.llm.model.toDialogueRequest
+import com.ee309.detectivegame.llm.model.DescriptionRequest
+import com.ee309.detectivegame.llm.model.EpilogueRequest
+import com.ee309.detectivegame.llm.model.toDescriptionRequest
+import com.ee309.detectivegame.llm.model.toEpilogueRequest
+import kotlinx.serialization.serializer
 import javax.inject.Inject
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    private val llmRepository: LLMRepository
+    private val llmRepository: LLMRepository,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
@@ -47,15 +58,167 @@ class GameViewModel @Inject constructor(
     private val _introShown = MutableStateFlow<Boolean>(false)
     val introShown: StateFlow<Boolean> = _introShown.asStateFlow()
     
+    private val _placeDescriptions = MutableStateFlow<Map<String, String>>(emptyMap())
+    val placeDescriptions: StateFlow<Map<String, String>> = _placeDescriptions.asStateFlow()
+    
+    private val _epilogueText = MutableStateFlow<String?>(null)
+    val epilogueText: StateFlow<String?> = _epilogueText.asStateFlow()
+    
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = false
     }
     
+    // Keys for SavedStateHandle
+    private companion object {
+        const val KEY_GAME_STATE = "game_state"
+        const val KEY_CONVERSATION_HISTORY = "conversation_history"
+        const val KEY_INTRO_TEXT = "intro_text"
+        const val KEY_INTRO_SHOWN = "intro_shown"
+        const val KEY_PLACE_DESCRIPTIONS = "place_descriptions"
+        const val KEY_EPILOGUE_TEXT = "epilogue_text"
+    }
+    
     init {
-        // GameUIState Error with empty message indicates initial state
-        // TODO: Make a distinct UI state for very first initialization
+        // Restore state from SavedStateHandle if available
+        restoreState()
+        
+        // If no saved state, set initial state
+        if (_gameState.value == null) {
+            _uiState.value = GameUiState.Error("")
+        }
+    }
+    
+    /**
+     * Restores game state from SavedStateHandle.
+     * Called during ViewModel initialization to recover from process death.
+     */
+    @OptIn(InternalSerializationApi::class)
+    private fun restoreState() {
+        try {
+            // Restore GameState
+            val gameStateJson = savedStateHandle.get<String>(KEY_GAME_STATE)
+            if (gameStateJson != null) {
+                val gameState = json.decodeFromString(GameState.serializer(), gameStateJson)
+                _gameState.value = gameState
+                _uiState.value = GameUiState.Success(gameState)
+            }
+            
+            // Restore conversation history
+            val conversationHistoryJson = savedStateHandle.get<String>(KEY_CONVERSATION_HISTORY)
+            if (conversationHistoryJson != null) {
+                val history = json.decodeFromString<Map<String, List<ConversationMessage>>>(
+                    MapSerializer(
+                        serializer<String>(),
+                        ListSerializer(ConversationMessage.serializer())
+                    ),
+                    conversationHistoryJson
+                )
+                _conversationHistory.value = history
+            }
+            
+            // Restore intro text
+            _introText.value = savedStateHandle.get<String>(KEY_INTRO_TEXT)
+            
+            // Restore intro shown flag
+            _introShown.value = savedStateHandle.get<Boolean>(KEY_INTRO_SHOWN) ?: false
+            
+            // Restore place descriptions
+            val placeDescriptionsJson = savedStateHandle.get<String>(KEY_PLACE_DESCRIPTIONS)
+            if (placeDescriptionsJson != null) {
+                val descriptions = json.decodeFromString(
+                    MapSerializer(
+                        serializer<String>(),
+                        serializer<String>()
+                    ),
+                    placeDescriptionsJson
+                )
+                _placeDescriptions.value = descriptions
+            }
+            
+            // Restore epilogue text
+            _epilogueText.value = savedStateHandle.get<String>(KEY_EPILOGUE_TEXT)
+        } catch (e: Exception) {
+            // If restoration fails, start fresh
+            // Log error but don't crash
+            println("Failed to restore state: ${e.message}")
+        }
+    }
+    
+    /**
+     * Saves current game state to SavedStateHandle.
+     * Called whenever state changes to persist across process death.
+     */
+    @OptIn(InternalSerializationApi::class)
+    private fun saveState() {
+        try {
+            // Save GameState
+            val gameState = _gameState.value
+            if (gameState != null) {
+                val gameStateJson = json.encodeToString(GameState.serializer(), gameState)
+                savedStateHandle[KEY_GAME_STATE] = gameStateJson
+            } else {
+                savedStateHandle.remove<String>(KEY_GAME_STATE)
+            }
+            
+            // Save conversation history
+            val conversationHistory = _conversationHistory.value
+            if (conversationHistory.isNotEmpty()) {
+                val historyJson = json.encodeToString(
+                    MapSerializer(
+                        serializer<String>(),
+                        ListSerializer(ConversationMessage.serializer())
+                    ),
+                    conversationHistory
+                )
+                savedStateHandle[KEY_CONVERSATION_HISTORY] = historyJson
+            } else {
+                savedStateHandle.remove<String>(KEY_CONVERSATION_HISTORY)
+            }
+            
+            // Save intro text
+            savedStateHandle[KEY_INTRO_TEXT] = _introText.value
+            
+            // Save intro shown flag
+            savedStateHandle[KEY_INTRO_SHOWN] = _introShown.value
+            
+            // Save place descriptions
+            val placeDescriptions = _placeDescriptions.value
+            if (placeDescriptions.isNotEmpty()) {
+                val descriptionsJson = json.encodeToString(
+                    MapSerializer(
+                        serializer<String>(),
+                        serializer<String>()
+                    ),
+                    placeDescriptions
+                )
+                savedStateHandle[KEY_PLACE_DESCRIPTIONS] = descriptionsJson
+            } else {
+                savedStateHandle.remove<String>(KEY_PLACE_DESCRIPTIONS)
+            }
+            
+            // Save epilogue text
+            savedStateHandle[KEY_EPILOGUE_TEXT] = _epilogueText.value
+        } catch (e: Exception) {
+            // Log error but don't crash - state saving is best-effort
+            println("Failed to save state: ${e.message}")
+        }
+    }
+    
+    /**
+     * Resets the game state to return to the StartScreen where user can input keywords.
+     * This is called when user clicks "Start New Game" from GameOverScreen.
+     */
+    fun resetToStartScreen() {
+        _gameState.value = null
         _uiState.value = GameUiState.Error("")
+        _conversationHistory.value = emptyMap()
+        _introText.value = null
+        _introShown.value = false
+        _placeDescriptions.value = emptyMap()
+        _epilogueText.value = null
+        _dialogueLoading.value = emptyMap()
+        saveState() // Clear saved state
     }
     
     fun startNewGame(keywords: String) {
@@ -64,6 +227,8 @@ class GameViewModel @Inject constructor(
             _conversationHistory.value = emptyMap() // Clear conversation history
             _introText.value = null // Clear intro text
             _introShown.value = false // Reset intro shown flag
+            _placeDescriptions.value = emptyMap()
+            _epilogueText.value = null
             try {
                 // Step 1: Call LLM 1 to generate initial game content
                 val userContent = keywords.ifBlank { "Generate a detective mystery game scenario" }
@@ -96,6 +261,10 @@ class GameViewModel @Inject constructor(
                 
                 // Store game state (but don't show main game yet - need intro first)
                 _gameState.value = gameState
+                saveState() // Save game state
+                
+                // Preload description for starting location (best-effort)
+                fetchPlaceDescription(gameState)
                 
                 // Step 2: Call LLM 2 to generate intro text
                 val introRequest = gameState.toIntroRequest()
@@ -124,6 +293,7 @@ class GameViewModel @Inject constructor(
                 when (introResult) {
                     is LLMResponseProcessor.ProcessingResult.Success -> {
                         _introText.value = introResult.data
+                        saveState() // Save intro text
                         // Keep UI in Loading state - IntroScreen will handle display
                         // The game state is set, but intro needs to be shown first
                     }
@@ -136,6 +306,7 @@ class GameViewModel @Inject constructor(
                         // Mark intro as shown so game can start
                         _introShown.value = true
                         _uiState.value = GameUiState.Success(gameState)
+                        saveState() // Save state
                     }
                 }
             } catch (e: Exception) {
@@ -155,6 +326,7 @@ class GameViewModel @Inject constructor(
         if (currentGameState != null) {
             _uiState.value = GameUiState.Success(currentGameState)
         }
+        saveState() // Save intro shown flag
     }
     
     fun executeAction(action: GameAction) {
@@ -181,13 +353,23 @@ class GameViewModel @Inject constructor(
             // 3. Update state
             updateGameState(newState)
 
+            // 3.5: Fire-and-forget description for current place when location changes or none cached
+            if (action is GameAction.Move || _placeDescriptions.value[newState.player.currentLocation] == null) {
+                fetchPlaceDescription(newState)
+            }
+
+            // 3.6: Generate epilogue on win (best-effort)
+            if (newState.phase == GamePhase.WIN || newState.phase == GamePhase.LOSE) {
+                generateEpilogue(newState)
+            }
+
             // 4. Check win/lose conditions
             checkWinConditions(newState)
         }
     }
 
     @OptIn(InternalSerializationApi::class)
-    fun transitionToPhase(phase: GamePhase) {
+    fun transitionToPhase(phase: GamePhase, lossReason: LossReason? = null) {
         try {
             val currentState = _gameState.value?: throw Exception("Game state is null")
             val currentPhase = currentState.phase
@@ -198,9 +380,19 @@ class GameViewModel @Inject constructor(
             }
 
             // actual transition logic
-            val newState = currentState.copy(phase = phase)
+            // Set lossReason only when transitioning to LOSE
+            val newState = if (phase == GamePhase.LOSE && lossReason != null) {
+                currentState.copy(phase = phase, lossReason = lossReason)
+            } else {
+                currentState.copy(phase = phase, lossReason = null)
+            }
             _gameState.value = newState
             _uiState.value = GameUiState.Success(newState)
+            saveState() // Save phase transition
+
+            if (phase == GamePhase.WIN || phase == GamePhase.LOSE) {
+                generateEpilogue(newState)
+            }
 
         } catch (e: Exception) {
             _uiState.value = GameUiState.Error(e.message ?: "Unknown error")
@@ -216,8 +408,7 @@ class GameViewModel @Inject constructor(
         // currentTime is relative to startTime, endTime is absolute
         val currentAbsolute = state.timeline.startTime.minutes + state.currentTime.minutes
         if (currentAbsolute >= state.timeline.endTime.minutes) {
-            // TODO: how to show that this is lose due to time limit?
-            transitionToPhase(GamePhase.LOSE)
+            transitionToPhase(GamePhase.LOSE, LossReason.TIMEOUT)
             return
         }
     }
@@ -250,6 +441,7 @@ class GameViewModel @Inject constructor(
     private fun updateGameState(newState: GameState) {
         _gameState.value = newState
         _uiState.value = GameUiState.Success(newState)
+        saveState() // Save game state update
     }
 
     @OptIn(InternalSerializationApi::class)
@@ -293,25 +485,28 @@ class GameViewModel @Inject constructor(
             return state
         }
         
-        // Return early if no question provided (no initial greeting)
-        if (question == null || question.isBlank()) {
-            return state
-        }
-
         // Store previous state for change detection
         val previousCollectedClues = state.player.collectedClues.toSet()
         val previousMentalState = character.mentalState
+        // Prepare question to send to LLM (even if player typed nothing, trigger first-turn response)
+        val effectiveQuestion = if (question.isNullOrBlank()) {
+            "Initial contact / greet the player based on your relationship to the victim."
+        } else {
+            question
+        }
         
         // Calculate absolute time for player's question
         val absoluteTimeNow = GameTime(state.timeline.startTime.minutes + state.currentTime.minutes)
         
-        // Add player's question to conversation history immediately
-        addConversationMessage(characterId, ConversationMessage(
-            text = question,
-            isFromPlayer = true,
-            timestamp = absoluteTimeNow,
-            type = ConversationMessageType.NORMAL
-        ))
+        // Add player's question to conversation history immediately (only if they actually typed something)
+        if (!question.isNullOrBlank()) {
+            addConversationMessage(characterId, ConversationMessage(
+                text = question,
+                isFromPlayer = true,
+                timestamp = absoluteTimeNow,
+                type = ConversationMessageType.NORMAL
+            ))
+        }
 
         // Set loading state
         _dialogueLoading.value = _dialogueLoading.value + (characterId to true)
@@ -323,7 +518,7 @@ class GameViewModel @Inject constructor(
         val dialogueRequest = try {
             state.toDialogueRequest(
                 characterId = characterId,
-                playerQuestion = question,
+                playerQuestion = effectiveQuestion,
                 conversationHistory = history
             )
         } catch (e: Exception) {
@@ -422,9 +617,16 @@ class GameViewModel @Inject constructor(
         // Calculate absolute time for character response
         val absoluteTimeAfter = GameTime(state.timeline.startTime.minutes + timeAfterQuestion.minutes)
         
+        // Compose final dialogue (victim gate)
+        val finalDialogue = if (character.isVictim) {
+            buildVictimDialogue(dialogueData.dialogue, state)
+        } else {
+            dialogueData.dialogue
+        }
+        
         // Add character's response to conversation history
         addConversationMessage(characterId, ConversationMessage(
-            text = dialogueData.dialogue,
+            text = finalDialogue,
             isFromPlayer = false,
             timestamp = absoluteTimeAfter,
             type = ConversationMessageType.NORMAL
@@ -493,7 +695,7 @@ class GameViewModel @Inject constructor(
         }
         
         // Update character's mental state if changed
-        if (dialogueData.mentalStateUpdate != null && previousMentalState != dialogueData.mentalStateUpdate) {
+        if (!character.isVictim && dialogueData.mentalStateUpdate != null && previousMentalState != dialogueData.mentalStateUpdate) {
             val updatedCharacters = newState.characters.map { char ->
                 if (char.id == characterId) {
                     char.copy(mentalState = dialogueData.mentalStateUpdate)
@@ -563,19 +765,43 @@ class GameViewModel @Inject constructor(
 
         // Transition to win/lose phase
         if (isCorrect) {
-            newState = newState.copy(phase = GamePhase.WIN)
+            newState = newState.copy(phase = GamePhase.WIN, lossReason = null)
         } else {
             // TODO: Maybe give more chances for wrong accusation
-            newState = newState.copy(phase = GamePhase.LOSE)
+            newState = newState.copy(phase = GamePhase.LOSE, lossReason = LossReason.FALSE_ACCUSATION)
         }
 
         return newState
+    }
+    
+    /**
+     * Builds the forced victim response.
+     * Always starts with the required prefix and appends a cause-of-death sentence.
+     * Falls back to the crime event description or a generic line if unavailable.
+     */
+    private fun buildVictimDialogue(llmText: String?, state: GameState): String {
+        val trimmed = llmText?.trim().orEmpty()
+        val alreadyPrefixed = trimmed.lowercase().startsWith("[dead men tell no tales")
+        val withoutPrefix = if (alreadyPrefixed) {
+            trimmed.lines().drop(1).joinToString("\n").trim()
+        } else trimmed
+        val causeFromCrime = state.timeline.getCrimeEvents()
+            .firstOrNull()
+            ?.description
+            ?.takeIf { it.isNotBlank() }
+        val causeLine = when {
+            withoutPrefix.isNotBlank() -> withoutPrefix
+            causeFromCrime != null -> causeFromCrime
+            else -> "Cause of death is unknown."
+        }
+        return "[Dead men tell no tales.]\n$causeLine"
     }
     
     fun addConversationMessage(characterId: String, message: ConversationMessage) {
         val currentHistory = _conversationHistory.value
         val characterHistory = currentHistory[characterId] ?: emptyList()
         _conversationHistory.value = currentHistory + (characterId to (characterHistory + message))
+        saveState() // Save conversation history
     }
     
     /**
@@ -597,5 +823,68 @@ class GameViewModel @Inject constructor(
     fun getConversationHistory(characterId: String): List<ConversationMessage> {
         return _conversationHistory.value[characterId] ?: emptyList()
     }
+
+    @OptIn(InternalSerializationApi::class)
+    private fun fetchPlaceDescription(state: GameState) {
+        val placeId = state.player.currentLocation
+        if (placeId.isBlank()) return
+        if (_placeDescriptions.value.containsKey(placeId)) return
+
+        viewModelScope.launch {
+            val request = state.toDescriptionRequest() ?: return@launch
+            val requestJson = json.encodeToString(DescriptionRequest.serializer(), request)
+            val descriptionText = try {
+                val response = llmRepository.callUpstage(
+                    task = LLMTask.DescriptionGenerator,
+                    userContent = requestJson,
+                    maxTokens = 800
+                )
+                when (val result = LLMResponseProcessor.DescriptionGenerator.process(response)) {
+                    is LLMResponseProcessor.ProcessingResult.Success -> result.data
+                    is LLMResponseProcessor.ProcessingResult.Failure -> state.getCurrentLocation()?.description.orEmpty()
+                }
+            } catch (e: Exception) {
+                state.getCurrentLocation()?.description.orEmpty()
+            }
+
+            if (descriptionText.isNotBlank()) {
+                _placeDescriptions.value = _placeDescriptions.value + (placeId to descriptionText)
+                saveState() // Save place description
+            }
+        }
+    }
+
+    @OptIn(InternalSerializationApi::class)
+    private fun generateEpilogue(state: GameState) {
+        if (_epilogueText.value != null) return
+
+        viewModelScope.launch {
+            val request = state.toEpilogueRequest()
+            val requestJson = json.encodeToString(EpilogueRequest.serializer(), request)
+            val epilogue = try {
+                val response = llmRepository.callUpstage(
+                    task = LLMTask.EpilogueGenerator,
+                    userContent = requestJson,
+                    maxTokens = 1200
+                )
+                when (val result = LLMResponseProcessor.EpilogueGenerator.process(response)) {
+                    is LLMResponseProcessor.ProcessingResult.Success -> result.data
+                    is LLMResponseProcessor.ProcessingResult.Failure -> defaultEpilogue(state)
+                }
+            } catch (e: Exception) {
+                defaultEpilogue(state)
+            }
+
+            _epilogueText.value = epilogue
+            saveState() // Save epilogue text
+        }
+    }
+
+    private fun defaultEpilogue(state: GameState): String {
+        val criminal = state.characters.find { it.isCriminal }?.name ?: "the culprit"
+        val victim = state.characters.find { it.isVictim }?.name ?: "the victim"
+        return "The case closes with $criminal brought to justice and $victim finally at peace."
+    }
+
 }
 

@@ -36,6 +36,8 @@ fun GameScreen(
     val dialogueLoading by viewModel.dialogueLoading.collectAsState()
     val introText by viewModel.introText.collectAsState()
     val introShown by viewModel.introShown.collectAsState()
+    val placeDescriptions by viewModel.placeDescriptions.collectAsState()
+    val epilogueText by viewModel.epilogueText.collectAsState()
     
     // Local state for dialogs and conversation
     var showCharacterDialog by remember { mutableStateOf(false) }
@@ -68,8 +70,9 @@ fun GameScreen(
                     GameOverScreen(
                         phase = currentGameState.phase,
                         gameState = currentGameState,
+                        epilogueText = epilogueText,
                         onRestart = {
-                            viewModel.startNewGame("")
+                            viewModel.resetToStartScreen()
                             conversationCharacterId = null
                         }
                     )
@@ -112,6 +115,8 @@ fun GameScreen(
                     MainGameScreenContent(
                         gameState = currentGameState,
                         viewModel = viewModel,
+                        placeDescription = placeDescriptions[currentGameState.player.currentLocation]
+                            ?: currentGameState.getCurrentLocation()?.description,
                         onInvestigateClick = {
                             val currentLocation = currentGameState.player.currentLocation
                             if (currentLocation.isNotEmpty()) {
@@ -184,6 +189,7 @@ fun GameScreen(
                     
                     // Place selection dialog
                     if (showPlaceDialog) {
+                        val victimPlaceId = currentGameState.characters.find { it.isVictim }?.currentLocation
                         PlaceSelectionDialog(
                             places = currentGameState.getUnlockedPlaces(),
                             onDismiss = {
@@ -208,7 +214,8 @@ fun GameScreen(
                             excludePlaceId = if (dialogActionType == DialogActionType.Move) {
                                 currentGameState.player.currentLocation
                             } else null,
-                            flags = currentGameState.flags
+                            flags = currentGameState.flags,
+                            victimPlaceId = victimPlaceId
                         )
                     }
                 }
@@ -264,6 +271,7 @@ private enum class DialogActionType {
 private fun MainGameScreenContent(
     gameState: com.ee309.detectivegame.domain.model.GameState,
     viewModel: GameViewModel,
+    placeDescription: String?,
     onInvestigateClick: () -> Unit,
     onQuestionClick: () -> Unit,
     onMoveClick: () -> Unit,
@@ -301,11 +309,34 @@ private fun MainGameScreenContent(
             )
         }
         
-        // Text display area (showing general game log - can be enhanced later)
-        TextDisplay(
-            messages = emptyList(), // TODO: Add general game log messages (investigations, movements, etc.)
-            modifier = Modifier.weight(1f)
-        )
+        // Scene description
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Scene",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = placeDescription?.ifBlank { "No description available." } ?: "No description available.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
+                )
+            }
+        }
         
         // Inventory/Clue display (expandable)
         InventoryDisplayWidget(

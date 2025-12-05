@@ -27,13 +27,13 @@ import kotlinx.serialization.InternalSerializationApi
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationScreen(
+    modifier: Modifier = Modifier,
     character: Character,
     messages: List<ConversationMessage>,
     gameState: GameState,
     isLoading: Boolean = false,
     onBack: () -> Unit,
     onSendMessage: (String) -> Unit,
-    modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
@@ -184,6 +184,7 @@ fun ConversationScreen(
 /**
  * Represents a message in a conversation.
  */
+@kotlinx.serialization.Serializable
 data class ConversationMessage(
     val text: String,
     val isFromPlayer: Boolean,
@@ -194,6 +195,7 @@ data class ConversationMessage(
 /**
  * Type of conversation message
  */
+@kotlinx.serialization.Serializable
 enum class ConversationMessageType {
     NORMAL,  // Regular player/character messages
     SYSTEM   // Game state change notifications

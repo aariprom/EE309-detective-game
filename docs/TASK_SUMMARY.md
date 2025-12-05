@@ -5,8 +5,9 @@
 The project uses a **Hybrid LLM Architecture**:
 - **LLM 1 (Initializer)**: Generates complete game structure upfront (characters, places, clues, timeline)
 - **LLM 2 (Intro Generator)**: Generates introduction text before game starts
-- **LLM 3-6 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions, actions, updates)
-- **Caching**: Cache generated content to improve performance and reduce costs
+- **LLM 3-4 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions)
+- **Epilogue Generator**: Generates epilogue text on game end
+- **Note**: No caching system - prompts are unique per context, making caching inefficient
 
 See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture documentation.
 
@@ -17,7 +18,7 @@ See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture docum
 | Module | Priority | Difficulty | Main Components |
 |--------|----------|------------|----------------|
 | **1. Core Game Engine & State Management** | HIGH | MEDIUM | State models, Time system, Game flow, Validation |
-| **2. LLM Integration Layer (Hybrid)** | HIGH | MEDIUM-HIGH | API client, LLM 1-5, Caching, Clue extraction |
+| **2. LLM Integration Layer (Hybrid)** | HIGH | MEDIUM-HIGH | API client, LLM 1-4, Epilogue, Basic clue extraction |
 | **3. Game Content System** | HIGH | MEDIUM | Characters, Places, Clues, Timeline, Flags |
 | **4. Android UI/UX Components** | HIGH | MEDIUM | Game screens, Action UI, Conversation UI, Configuration |
 | **5. Game Logic & Validation** | HIGH | MEDIUM-HIGH | Action handlers, Timeline processing, Win/lose conditions |
@@ -33,7 +34,7 @@ See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture docum
 | 1.1 Game State Data Models | HIGH | MEDIUM | ✅ POSSIBLE | - |
 | 1.2 Time Management System | HIGH | MEDIUM | ✅ POSSIBLE | 1.1 |
 | 1.3 Game Flow Controller | HIGH | MEDIUM | ✅ POSSIBLE | 1.1, 1.2 |
-| 1.4 Action Validation System | HIGH | HIGH | ⚠️ CHALLENGING | 1.1, 2.1 |
+| 1.4 Action Validation System | - | - | ❌ NOT PLANNED | - |
 
 ### Module 2: LLM Integration Layer (Hybrid Architecture)
 
@@ -44,10 +45,10 @@ See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture docum
 | 2.3 LLM 2: Intro Generator | HIGH | MEDIUM | ✅ POSSIBLE | 2.1, 2.2 |
 | 2.4 LLM 3: Dialogue Generator | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 2.1, 3.1, 2.8 |
 | 2.5 LLM 4: Description Generator | MEDIUM | MEDIUM | ✅ POSSIBLE | 2.1, 2.8 |
-| 2.6 LLM 5: Action Handler | MEDIUM | HIGH | ⚠️ CHALLENGING | 2.1, 1.4 |
-| 2.7 LLM 6: Component Updater | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 2.1, 3.1, 3.2, 3.3, 2.8 |
-| 2.7 Clue Extraction System | MEDIUM | MEDIUM-HIGH | ⚠️ CHALLENGING | 2.1, 3.3 |
-| 2.8 LLM Response Caching System | MEDIUM | MEDIUM | ✅ POSSIBLE | 2.1 |
+| 2.6 LLM 5: Action Handler | - | - | ❌ NOT PLANNED | - |
+| 2.7 LLM 6: Component Updater | - | - | ❌ NOT PLANNED | - |
+| 2.7 Clue Extraction System | MEDIUM | MEDIUM | ✅ BASIC VERSION | 2.1, 3.3 |
+| 2.8 LLM Response Caching System | - | - | ❌ NOT PLANNED | - |
 
 ### Module 3: Game Content System
 
@@ -66,13 +67,13 @@ See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture docum
 | 4.1 Main Game Screen Layout | HIGH | MEDIUM | ✅ POSSIBLE | 1.1 |
 | 4.2 Text Display System | HIGH | LOW-MEDIUM | ✅ POSSIBLE | - |
 | 4.3 Action Selection UI | HIGH | MEDIUM | ✅ POSSIBLE | 4.1 |
-| 4.4 Free Action Input System | MEDIUM | MEDIUM-HIGH | ✅ POSSIBLE | 4.1 |
-| 4.5 Character & Place Selection UI | HIGH | MEDIUM | ✅ POSSIBLE | 3.1, 3.2, 4.1 |
-| 4.6 Conversation/Interrogation UI | HIGH | MEDIUM | ✅ POSSIBLE | 2.3, 4.1 |
-| 4.7 Game Start & Configuration | MEDIUM | LOW-MEDIUM | ✅ POSSIBLE | 2.2 |
-| 4.8 Tutorial Screen | MEDIUM | LOW | ✅ POSSIBLE | - |
-| 4.9 Game Over Screen | MEDIUM | LOW-MEDIUM | ✅ POSSIBLE | 5.7 |
-| 4.10 Save/Load System UI | LOW | LOW-MEDIUM | ✅ POSSIBLE | 1.3 |
+| 4.4 Free Action Input System | - | - | ❌ NOT PLANNED | - |
+| 4.5 Character & Place Selection UI | HIGH | MEDIUM | ✅ IMPLEMENTED | 3.1, 3.2, 4.1 |
+| 4.6 Conversation/Interrogation UI | HIGH | MEDIUM | ✅ IMPLEMENTED | 2.3, 4.1 |
+| 4.7 Game Start & Configuration | MEDIUM | LOW-MEDIUM | ✅ IMPLEMENTED | 2.2 |
+| 4.8 Tutorial Screen | - | - | ❌ NOT PLANNED | - |
+| 4.9 Game Over Screen | MEDIUM | LOW-MEDIUM | ✅ IMPLEMENTED | 5.7 |
+| 4.10 Save/Load System UI | LOW | LOW-MEDIUM | ⚠️ MIGHT IMPLEMENT | 1.3 |
 
 ### Module 5: Game Logic & Validation
 
@@ -81,11 +82,11 @@ See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture docum
 | 5.1 Investigation Handler | HIGH | MEDIUM | ✅ POSSIBLE | 3.2, 3.3, 1.2, 2.4, 2.8 |
 | 5.2 Questioning Handler | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 2.3, 3.1, 3.3, 2.7, 2.8 |
 | 5.3 Movement Handler | HIGH | LOW-MEDIUM | ✅ POSSIBLE | 3.2, 1.2 |
-| 5.4 Accusation Handler | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 3.1, 3.3 |
-| 5.5 Free Action Handler | MEDIUM | HIGH | ⚠️ CHALLENGING | 1.4, 2.5, 2.8 |
-| 5.6 Timeline Event Processor | HIGH | MEDIUM-HIGH | ✅ POSSIBLE | 3.4, 2.6, 2.8 |
-| 5.7 Win/Lose Condition Checker | HIGH | MEDIUM | ✅ POSSIBLE | 5.4, 1.2 |
-| 5.8 Component Update Logic | HIGH | MEDIUM | ✅ POSSIBLE | 3.1, 3.2, 3.3, 2.6, 2.8 |
+| 5.4 Accusation Handler | HIGH | MEDIUM-HIGH | ✅ IMPLEMENTED (Simple) | 3.1, 3.3 |
+| 5.5 Free Action Handler | - | - | ❌ NOT PLANNED | - |
+| 5.6 Timeline Event Processor | HIGH | MEDIUM-HIGH | ✅ IMPLEMENTED (Basic) | 3.4 |
+| 5.7 Win/Lose Condition Checker | HIGH | MEDIUM | ✅ IMPLEMENTED | 5.4, 1.2 |
+| 5.8 Component Update Logic | HIGH | MEDIUM | ✅ IMPLEMENTED (Basic) | 3.1, 3.2, 3.3 |
 
 ---
 
@@ -96,74 +97,88 @@ See [LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md) for detailed architecture docum
 
 ---
 
-## Critical Path (Minimum Viable Product)
+## Critical Path (Completed)
 
-To build a playable game, these tasks must be completed in order:
+The game is fully playable with the following completed features:
 
-1. **Foundation** (Week 1)
+1. **Foundation** ✅
    - 1.1 Game State Data Models
    - 1.2 Time Management System
    - 2.1 LLM API Client
    - 3.1, 3.2, 3.3 Character/Place/Clue Management
-
-2. **Content Generation (Hybrid Approach)** (Week 2)
-   - **2.2 LLM 1: Initial Content Generator** - Upfront generation (complete structure)
    - 3.4 Timeline System
-   - **2.8 LLM Response Caching System** - Performance optimization
+   - 3.5 Flag System
 
-3. **Runtime LLMs & Game Logic** (Week 3)
-   - **2.3 LLM 2: Dialogue Generator** - Lazy loading for conversations
-   - **2.4 LLM 3: Description Generator** - Lazy loading for descriptions
-   - **2.6 LLM 5: Component Updater** - Timeline-based updates
-   - 2.7 Clue Extraction System
+2. **Content Generation (Hybrid Approach)** ✅
+   - **2.2 LLM 1: Initial Content Generator** - Upfront generation (complete structure)
+   - **2.3 LLM 2: Intro Generator** - Introduction text generation
+   - **2.4 LLM 3: Dialogue Generator** - Lazy loading for conversations
+   - **2.5 LLM 4: Description Generator** - Lazy loading for descriptions
+   - **Epilogue Generator** - Game ending text generation
+   - 2.7 Basic Clue Extraction System
+
+3. **Game Logic** ✅
    - 1.3 Game Flow Controller
    - 5.1, 5.2, 5.3, 5.4 Core Action Handlers
-   - 5.6 Timeline Event Processor
+   - 5.6 Timeline Event Processor (Basic logic)
    - 5.7 Win/Lose Conditions
-   - 5.8 Component Updates
+   - 5.8 Component Updates (Basic state management)
 
-4. **UI Integration** (Week 4)
+4. **UI Integration** ✅
    - 4.1 Main Game Screen
    - 4.2 Text Display
    - 4.3 Action Selection
    - 4.5 Character/Place Selection
    - 4.6 Conversation UI (Integration with LLM 3)
-
-5. **Advanced Features** (Week 5+)
-   - **2.6 LLM 5: Action Handler** - Free action system
    - 4.7 Game Configuration
-   - 1.4, 5.5 Free Action System (if time permits)
+   - 4.9 Game Over Screen
+
+## Not Planned / Removed Features
+
+- ❌ 1.4 Action Validation System - Not needed for predefined actions
+- ❌ 2.6 LLM 5: Action Handler - Free actions too complicated
+- ❌ 2.7 LLM 6: Component Updater - Basic timeline processing sufficient
+- ❌ 2.8 LLM Response Caching System - Inefficient (unique prompts)
+- ❌ 4.4 Free Action Input System - Not implementing free actions
+- ❌ 4.8 Tutorial Screen - Not needed
+- ❌ 5.5 Free Action Handler - Not implementing free actions
+
+## Potential Future Features
+
+- ⚠️ 4.10 Save/Load System - Might implement with Room database
 
 ---
 
 ## Risk Areas
 
-### High Risk (Requires Careful Planning)
-- **Action Validation (1.4, 5.5)**: Balancing flexibility with game integrity
-- **LLM 5: Action Handler (2.6)**: Balancing flexibility with game integrity
-- **Clue Extraction (2.7)**: Ensuring reliable structured output from LLM
-- **Timeline Event Processing (5.6)**: Managing complex state updates
+### Resolved / Not Applicable
+- ✅ **Action Validation (1.4, 5.5)**: Not implemented - not needed
+- ✅ **LLM 5: Action Handler (2.6)**: Not implemented - too complicated
+- ✅ **LLM 6: Component Updater (2.7)**: Not implemented - basic processing sufficient
+- ✅ **Caching Strategy (2.8)**: Not implemented - inefficient for unique prompts
+- ✅ **Free Action System**: Not implemented - using predefined actions only
 
-### Medium Risk
-- **LLM Response Quality**: Ensuring consistent, game-appropriate responses across LLM 2-6
-- **Caching Strategy (2.8)**: Managing cache invalidation correctly
-- **Component Updates (2.6, 5.8)**: Maintaining state consistency across updates
-- **Free Action System**: Preventing exploits while maintaining fun
+### Current Considerations
+- **LLM Response Quality**: Ensuring consistent, game-appropriate responses across LLM 1-4
+- **Timeline Event Processing (5.6)**: Basic logic implemented - sufficient for gameplay
+- **Component Updates (5.8)**: Basic state management - working well
 
 ### Low Risk
-- **UI Components**: Standard Android development
-- **Data Models**: Straightforward data structures
-- **Basic Action Handlers**: Clear logic flow
+- ✅ **UI Components**: Standard Android development - completed
+- ✅ **Data Models**: Straightforward data structures - completed
+- ✅ **Basic Action Handlers**: Clear logic flow - completed
 
 ---
 
-## Estimated Timeline
+## Project Status
 
-- **Minimum Viable Product**: 4-5 weeks
-- **Full Feature Set**: 6-8 weeks
-- **Polished Release**: 8-10 weeks
+- ✅ **Core Features**: Completed and playable
+- ✅ **LLM Integration**: LLM 1-4 + Epilogue Generator implemented
+- ✅ **UI Components**: All main screens implemented
+- ✅ **Game Logic**: All core action handlers implemented
+- ⚠️ **Save/Load**: Might implement in future
 
-*Note: Timeline assumes 1 developer working part-time. Adjust based on team size and availability.*
+*The game is fully playable with the current feature set. Removed features were deemed unnecessary or too complex for the current scope.*
 
 ---
 

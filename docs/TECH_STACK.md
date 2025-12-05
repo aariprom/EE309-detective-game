@@ -196,18 +196,11 @@ class GameViewModel : ViewModel() {
 - `androidx.room:room-compiler` (via KSP)
 
 **Use Cases:**
-- Save/load game state
-- Cache LLM responses
-- Store game history
-- Persist player progress
+- Save/load game state (if implemented)
+- Store game history (if implemented)
+- Persist player progress (if implemented)
 
-#### 5.2 Caching Strategy
-
-**In-Memory Cache + Room Database**
-
-- **In-Memory Cache**: Fast access to LLM responses during session
-- **Room Database**: Persistent cache for save/load games
-- Use keys: `Character/Place + Context (time, clues)`
+**Note**: LLM response caching is not implemented - prompts are unique per context, making caching inefficient.
 
 ---
 
@@ -346,8 +339,9 @@ app/src/main/java/com/ee309/detectivegame/
 │   └── state/          # UI state classes
 └── llm/
     ├── client/         # LLM API client (Retrofit)
-    ├── generators/     # LLM 1-5 generators
-    └── cache/          # Response cache
+    ├── config/         # LLM tasks, prompts, schemas
+    ├── data/           # LLM repository
+    └── model/          # LLM request/response models
 ```
 
 ---

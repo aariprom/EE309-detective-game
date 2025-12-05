@@ -23,9 +23,10 @@ data class GameState(
     val timeline: Timeline = Timeline(
         baseTime = GameTime(960),   // 16:00 (4 PM) - earliest point in timeline
         startTime = GameTime(1080), // 18:00 (6 PM) - absolute time when game starts
-        endTime = GameTime(1440)    // 24:00 (midnight) - absolute time when game ends
+        endTime = GameTime(1560)    // 26:00 - extended absolute time when game ends
     ),
-    val flags: Map<String, Boolean> = emptyMap()
+    val flags: Map<String, Boolean> = emptyMap(),
+    val lossReason: LossReason? = null  // Only set when phase is LOSE
 ) {
     /**
      * Retrieves a character by its ID.
@@ -233,7 +234,7 @@ data class GameState(
     fun removeClue(clueId: String): GameState {
         return copy(clues = clues.filter { it.id != clueId })
     }
-    
+
     /**
      * Updates the game timeline.
      * The timeline contains all scheduled events and the start/end times of the game.

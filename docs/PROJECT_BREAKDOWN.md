@@ -39,13 +39,8 @@ This document breaks down the Android detective game project into manageable mod
   - State persistence (save/load game)
 
 ### 1.4 Action Validation System
-- **Priority**: HIGH (Critical Path)
-- **Difficulty**: HIGH
-- **Feasibility**: ⚠️ CHALLENGING (Requires strong LLM validation)
-- **Description**:
-  - Validate user actions (investigation, questioning, movement, free actions)
-  - Prevent invalid/impossible actions
-  - Context-aware validation (time, location, prerequisites)
+- **Status**: ❌ NOT PLANNED
+- **Reason**: Not needed - basic validation is sufficient for predefined actions (investigate, question, move, accuse). No free-form actions require advanced validation.
 
 ---
 
@@ -56,8 +51,9 @@ This document breaks down the Android detective game project into manageable mod
 **Architecture Overview**:
 - **LLM 1 (Initializer)**: Generates complete game structure upfront (characters, places, clues, timeline)
 - **LLM 2 (Intro Generator)**: Generates introduction text before game starts
-- **LLM 3-6 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions, actions, updates)
-- **Caching**: Cache generated content to improve performance and reduce costs
+- **LLM 3-4 (Runtime)**: Generate dynamic content on-demand (dialogue, descriptions)
+- **Epilogue Generator**: Generates epilogue text on game end
+- **Note**: No caching system - prompts are unique per context, making caching inefficient
 
 ### 2.1 LLM API Client
 - **Priority**: HIGH (Critical Path)
@@ -101,74 +97,45 @@ This document breaks down the Android detective game project into manageable mod
 - **Priority**: HIGH (Critical Path)
 - **Difficulty**: MEDIUM-HIGH
 - **Feasibility**: ✅ POSSIBLE
+- **Status**: ✅ IMPLEMENTED
 - **Description**:
   - **Generate conversations on-demand** when player questions a character
   - Input: character data, player's collected clues, current time, player's question, cooperation level
   - Output: character dialogue response, potential new clues
   - Character personality and knowledge-based responses
   - Context-aware responses (time, player's clues, mental_state)
-  - **Caching**: Cache dialogue for same character + same context (time, player clues)
-  - Extract clues from conversations for clue system
+  - Basic clue extraction from dialogue responses (structured output)
 
 ### 2.5 LLM 4: Description Generator (Lazy Loading)
 - **Priority**: MEDIUM
 - **Difficulty**: MEDIUM
 - **Feasibility**: ✅ POSSIBLE
+- **Status**: ✅ IMPLEMENTED
 - **Description**:
   - **Generate descriptions on-demand** when player investigates a place or views character
   - Input: place/character data, current time, timeline events, player's clues
   - Output: contextual descriptions (place appearance, character expressions/appearance)
   - Event descriptions based on timeline and player actions
-  - Epilogue generation for game endings
-  - **Caching**: Cache descriptions for same place/character + same time state
+  - Epilogue generation for game endings (separate Epilogue Generator)
 
 ### 2.6 LLM 5: Action Handler (Lazy Loading)
-- **Priority**: MEDIUM
-- **Difficulty**: HIGH
-- **Feasibility**: ⚠️ CHALLENGING (Requires strong validation)
-- **Description**:
-  - **Handle free-form player actions on-demand**
-  - Input: action description, current game state, location, player tools, current time
-  - Output: action validation (feasible/not feasible), action outcome, state changes
-  - Strong validation to prevent game-breaking actions while maintaining flexibility
-  - Generate narrative for action outcomes
-  - **Caching**: Rarely (actions are usually unique), but cache common actions
+- **Status**: ❌ NOT PLANNED
+- **Reason**: Free-form action system is too complicated to implement and validate. Game uses predefined actions only (investigate, question, move, accuse).
 
 ### 2.7 LLM 6: Component Updater (Lazy Loading)
-- **Priority**: HIGH (Critical Path)
-- **Difficulty**: MEDIUM-HIGH
-- **Feasibility**: ✅ POSSIBLE
-- **Description**:
-  - **Update game components on-demand** based on timeline events and player actions
-  - Input: timeline event, current game state, affected components
-  - Output: updated component states, narrative for event
-  - Regenerate character states (mental_state, known_clues, location)
-  - Update place states (available_clues, current_characters)
-  - Update clue availability based on unlock_conditions
-  - **Caching**: Cache updates for same event + same state
+- **Status**: ❌ NOT PLANNED
+- **Reason**: Too complicated. Timeline events are processed with basic logic only (character movement, place changes, flags). No LLM-based component updates needed for current gameplay.
 
 ### 2.7 Clue Extraction System
-- **Priority**: MEDIUM
-- **Difficulty**: MEDIUM-HIGH
-- **Feasibility**: ⚠️ CHALLENGING (Requires structured output parsing)
+- **Status**: ✅ BASIC VERSION IMPLEMENTED
 - **Description**:
-  - Parse LLM responses to extract structured clues
-  - Used by LLM 3 (Dialogue) and LLM 4 (Descriptions)
-  - Convert narrative output to clue objects (who, what, when, where, why)
-  - Validate clue format and completeness
-  - Use structured output formats (JSON, function calling) when possible
+  - Basic clue extraction from LLM 3 (Dialogue) responses using structured output
+  - Clues are extracted from dialogue responses via JSON schema
+  - No enhanced extraction system needed - current implementation is sufficient
 
 ### 2.8 LLM Response Caching System
-- **Priority**: MEDIUM
-- **Difficulty**: MEDIUM
-- **Feasibility**: ✅ POSSIBLE
-- **Description**:
-  - Cache generated dialogue, descriptions, and action outcomes
-  - Cache key: Character/Place + Context (time, player clues, game state)
-  - Cache invalidation: When context changes significantly (time advances, new clues found)
-  - Storage: In-memory for session, persistent for save games
-  - Reduce API costs and improve response times
-  - Cache hit/miss statistics for optimization
+- **Status**: ❌ NOT PLANNED
+- **Reason**: Caching is inefficient since prompts are unique per context (different time, different player clues, different questions). No significant cache hit rate expected.
 
 ---
 
@@ -261,14 +228,8 @@ This document breaks down the Android detective game project into manageable mod
   - Action confirmation dialogs
 
 ### 4.4 Free Action Input System
-- **Priority**: MEDIUM
-- **Difficulty**: MEDIUM-HIGH
-- **Feasibility**: ✅ POSSIBLE
-- **Description**:
-  - Text input field for free-form actions
-  - Input validation feedback
-  - Action suggestions/autocomplete
-  - Input history
+- **Status**: ❌ NOT PLANNED
+- **Reason**: Free-form action system is not implemented. Game uses predefined actions only.
 
 ### 4.5 Character & Place Selection UI
 - **Priority**: HIGH (Critical Path)
@@ -301,13 +262,8 @@ This document breaks down the Android detective game project into manageable mod
   - Settings persistence
 
 ### 4.8 Tutorial Screen
-- **Priority**: MEDIUM
-- **Difficulty**: LOW
-- **Feasibility**: ✅ POSSIBLE
-- **Description**:
-  - Tutorial content display
-  - Step-by-step guidance
-  - Skip option
+- **Status**: ❌ NOT PLANNED
+- **Reason**: Tutorial system is not needed. Game is intuitive enough with predefined actions. Mock data serves as backward compatibility and LLM fallback only.
 
 ### 4.9 Game Over Screen
 - **Priority**: MEDIUM
@@ -323,10 +279,12 @@ This document breaks down the Android detective game project into manageable mod
 - **Priority**: LOW
 - **Difficulty**: LOW-MEDIUM
 - **Feasibility**: ✅ POSSIBLE
+- **Status**: ⚠️ MIGHT IMPLEMENT
 - **Description**:
-  - Save game functionality
+  - Save game functionality using Room database
   - Load game screen with save slots
   - Save game metadata (date, time, progress)
+  - Game state serialization already supported (kotlinx.serialization)
 
 ---
 
@@ -338,11 +296,11 @@ This document breaks down the Android detective game project into manageable mod
 - **Priority**: HIGH (Critical Path)
 - **Difficulty**: MEDIUM
 - **Feasibility**: ✅ POSSIBLE
+- **Status**: ✅ IMPLEMENTED
 - **Description**:
   - Handle place investigation actions
   - Trigger **LLM 4 (Description Generator)** to generate place description
-  - Generate clues based on investigation (via LLM 4 or direct extraction)
-  - Check cache before calling LLM (same place + same time state)
+  - Generate clues based on investigation (direct extraction from available clues)
   - Time consumption calculation
   - Failure conditions (time-based, insufficient prerequisites)
 
@@ -350,13 +308,14 @@ This document breaks down the Android detective game project into manageable mod
 - **Priority**: HIGH (Critical Path)
 - **Difficulty**: MEDIUM-HIGH
 - **Feasibility**: ✅ POSSIBLE
+- **Status**: ✅ IMPLEMENTED
 - **Description**:
   - Initiate questioning with character
   - Trigger **LLM 3 (Dialogue Generator)** for conversation flow
-  - Check cache before calling LLM (same character + same context)
-  - Extract clues from conversation (via LLM 3 or clue extraction system)
+  - Extract clues from conversation (via structured output from LLM 3)
   - Cooperation level affecting responses (passed to LLM 3)
   - Time consumption calculation
+  - Conversation history tracking
 
 ### 5.3 Movement Action Handler
 - **Priority**: HIGH (Critical Path)
@@ -372,35 +331,27 @@ This document breaks down the Android detective game project into manageable mod
 - **Priority**: HIGH (Critical Path)
 - **Difficulty**: MEDIUM-HIGH
 - **Feasibility**: ✅ POSSIBLE
+- **Status**: ✅ IMPLEMENTED (Simple Version)
 - **Description**:
   - Handle player accusation of criminal
-  - Evidence validation system
-  - Check if sufficient evidence exists
+  - Simple validation: checks if accused character is criminal (isCriminal flag)
   - Trigger game end condition (win/lose)
+  - **Note**: Advanced evidence validation not implemented - simple check is sufficient for current gameplay
 
 ### 5.5 Free Action Handler
-- **Priority**: MEDIUM
-- **Difficulty**: HIGH
-- **Feasibility**: ⚠️ CHALLENGING (Requires strong validation)
-- **Description**:
-  - Handle free-form player actions
-  - Trigger **LLM 4 (Action Handler)** for validation and outcome
-  - LLM-based action validation (feasible/not feasible)
-  - Strong validation to prevent game-breaking actions
-  - Execute valid actions (e.g., breaking locked door, hiding)
-  - Generate narrative for action outcomes (via LLM 4)
-  - Time/effect calculation
+- **Status**: ❌ NOT PLANNED
+- **Reason**: Free-form action system is not implemented. Game uses predefined actions only.
 
 ### 5.6 Timeline Event Processor
 - **Priority**: HIGH (Critical Path)
 - **Difficulty**: MEDIUM-HIGH
 - **Feasibility**: ✅ POSSIBLE
+- **Status**: ✅ IMPLEMENTED (Basic Version)
 - **Description**:
   - Process timeline events based on current time
-  - Trigger character actions (evidence destruction, movement)
-  - Call **LLM 6 (Component Updater)** to update component states
-  - Check cache before calling LLM (same event + same state)
-  - Generate narrative for timeline events (via LLM 6)
+  - Basic event processing: character movement, place changes, crime events, custom events
+  - Updates game state with flags and character locations
+  - **Note**: No LLM-based component updates - uses basic logic only. Game is playable without dynamic LLM updates.
 
 ### 5.7 Win/Lose Condition Checker
 - **Priority**: HIGH (Critical Path)
@@ -418,42 +369,37 @@ This document breaks down the Android detective game project into manageable mod
 - **Priority**: HIGH (Critical Path)
 - **Difficulty**: MEDIUM
 - **Feasibility**: ✅ POSSIBLE
+- **Status**: ✅ IMPLEMENTED (Basic Version)
 - **Description**:
   - Update components after each action/time unit
-  - Coordinate with **LLM 6 (Component Updater)** for timeline-based updates
-  - Apply timeline events to components (via LLM 6)
+  - Apply timeline events to components (basic logic only)
   - Update character states, place states, clue availability
   - Handle unlock conditions
-  - Cache invalidation when components are updated
+  - **Note**: No LLM-based component updates - uses basic state management only
 
 ---
 
 ## Task Summary by Priority
 
-### Critical Path (Must Complete)
-1. Core Game Engine & State Management (1.1, 1.2, 1.3)
-2. LLM Integration Layer (2.1, 2.2, 2.3, 2.6, 2.8)
-3. Game Content System (3.1, 3.2, 3.3, 3.4)
-4. Android UI - Main Components (4.1, 4.2, 4.3, 4.5, 4.6)
-5. Game Logic - Core Actions (5.1, 5.2, 5.3, 5.4, 5.6, 5.7, 5.8)
+### Critical Path (Completed)
+1. ✅ Core Game Engine & State Management (1.1, 1.2, 1.3)
+2. ✅ LLM Integration Layer (2.1, 2.2, 2.3, 2.4, 2.5, Epilogue Generator)
+3. ✅ Game Content System (3.1, 3.2, 3.3, 3.4, 3.5)
+4. ✅ Android UI - Main Components (4.1, 4.2, 4.3, 4.5, 4.6, 4.7, 4.9)
+5. ✅ Game Logic - Core Actions (5.1, 5.2, 5.3, 5.4, 5.6, 5.7, 5.8)
 
-### High Priority (Important for Full Experience)
-- Action Validation System (1.4)
-- LLM 2: Intro Generator (2.3)
-- LLM 4: Description Generator (2.5)
-- Clue Extraction System (2.8)
-- LLM 5: Action Handler (2.6)
-- Flag System (3.5)
-- Free Action Input UI (4.4)
-- Game Start Configuration (4.7)
-- Free Action Handler (5.5)
+### Not Planned / Removed Features
+- ❌ Action Validation System (1.4) - Not needed
+- ❌ LLM 5: Action Handler (2.6) - Too complicated
+- ❌ LLM 6: Component Updater (2.7) - Too complicated
+- ❌ LLM Response Caching System (2.8) - Inefficient
+- ❌ Enhanced Clue Extraction (2.7) - Basic version sufficient
+- ❌ Free Action Input UI (4.4) - Not implementing free actions
+- ❌ Free Action Handler (5.5) - Not implementing free actions
+- ❌ Tutorial Screen (4.8) - Not needed
 
-### Medium Priority (Enhancement Features)
-- Tutorial Screen (4.8)
-- Game Over Screen (4.9)
-
-### Low Priority (Nice to Have)
-- Save/Load System UI (4.10)
+### Potential Future Features
+- ⚠️ Save/Load System UI (4.10) - Might implement with Room database
 
 ---
 
@@ -462,10 +408,10 @@ This document breaks down the Android detective game project into manageable mod
 ### ✅ POSSIBLE
 Most tasks are feasible with standard Android development and LLM API integration.
 
-### ⚠️ CHALLENGING
-- **Action Validation (1.4, 5.5)**: Requires sophisticated LLM prompting and validation logic to prevent game-breaking actions while maintaining flexibility.
-- **Clue Extraction (2.7)**: Requires structured output from LLM or robust parsing. May need to use function calling or JSON mode.
-- **LLM 5: Action Handler (2.6)**: Balancing flexibility with game integrity requires careful prompt engineering.
+### ⚠️ CHALLENGING (Not Implemented)
+- **Action Validation (1.4, 5.5)**: Not implemented - not needed for predefined actions.
+- **LLM 5: Action Handler (2.6)**: Not implemented - free-form actions too complicated.
+- **LLM 6: Component Updater (2.7)**: Not implemented - basic timeline processing sufficient.
 
 ### 🔧 Recommended Tech Stack
 
@@ -484,42 +430,36 @@ See **[TECH_STACK.md](./TECH_STACK.md)** for comprehensive tech stack recommenda
 
 ---
 
-## Development Phases Recommendation
+## Development Phases (Completed)
 
-### Phase 1: Foundation (Weeks 1-2)
-- Core game engine and state management (1.1, 1.2, 1.3)
-- Basic data models (3.1, 3.2, 3.3, 3.4)
-- LLM API client setup (2.1)
-- **LLM 1: Initial Content Generator** (2.2) - Upfront generation
-- **LLM 2: Intro Generator** (2.3) - Introduction text generation
+### Phase 1: Foundation ✅
+- ✅ Core game engine and state management (1.1, 1.2, 1.3)
+- ✅ Basic data models (3.1, 3.2, 3.3, 3.4, 3.5)
+- ✅ LLM API client setup (2.1)
+- ✅ **LLM 1: Initial Content Generator** (2.2) - Upfront generation
+- ✅ **LLM 2: Intro Generator** (2.3) - Introduction text generation
 
-### Phase 2: Content System & Runtime LLMs (Weeks 2-3)
-- Complete Character, Place, Clue, Timeline systems (3.1, 3.2, 3.3, 3.4)
-- **LLM 3: Dialogue Generator** (2.4) - Lazy loading for conversations
-- **LLM 4: Description Generator** (2.5) - Lazy loading for descriptions
-- **LLM Response Caching System** (2.8) - Performance optimization
-- Clue Extraction System (2.7)
+### Phase 2: Content System & Runtime LLMs ✅
+- ✅ Complete Character, Place, Clue, Timeline systems (3.1, 3.2, 3.3, 3.4)
+- ✅ **LLM 3: Dialogue Generator** (2.4) - Lazy loading for conversations
+- ✅ **LLM 4: Description Generator** (2.5) - Lazy loading for descriptions
+- ✅ **Epilogue Generator** - Game ending text generation
+- ✅ Basic clue extraction from dialogue (structured output)
 
-### Phase 3: Game Logic (Weeks 3-4)
-- Core action handlers (5.1, 5.2, 5.3, 5.4)
-- **LLM 6: Component Updater** (2.7) - Timeline-based updates
-- Timeline event processing (5.6)
-- Win/lose conditions (5.7)
-- Component update logic (5.8)
+### Phase 3: Game Logic ✅
+- ✅ Core action handlers (5.1, 5.2, 5.3, 5.4)
+- ✅ Timeline event processing (5.6) - Basic logic only
+- ✅ Win/lose conditions (5.7)
+- ✅ Component update logic (5.8) - Basic state management
 
-### Phase 4: Android UI (Weeks 4-5)
-- Main game screen (4.1, 4.2)
-- Action selection UI (4.3)
-- Conversation UI (4.6) - Integration with LLM 2
-- Character & Place selection UI (4.5)
-- Basic navigation
+### Phase 4: Android UI ✅
+- ✅ Main game screen (4.1, 4.2)
+- ✅ Action selection UI (4.3)
+- ✅ Conversation UI (4.6) - Integration with LLM 3
+- ✅ Character & Place selection UI (4.5)
+- ✅ Game Start Configuration (4.7)
+- ✅ Game over screens (4.9)
 
-### Phase 5: Advanced Features (Weeks 5-6)
-- **LLM 4: Action Handler** (2.5) - Free action system
-- Free Action Input UI (4.4)
-- Action Validation System (1.4)
-- Game Start Configuration (4.7)
-- Tutorial (4.8)
-- Game over screens (4.9)
-- Save/load (if time permits) (4.10)
+### Potential Future Phase
+- ⚠️ Save/Load System (4.10) - Might implement with Room database
 

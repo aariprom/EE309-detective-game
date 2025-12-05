@@ -23,7 +23,7 @@ This document describes the **Hybrid LLM Architecture** chosen for the detective
 3. **Balanced User Experience**
    - Player sees game structure immediately
    - Conversations feel natural and responsive
-   - Not too slow (caching helps)
+   - Not too slow (focused runtime calls)
    - Not too rigid (dynamic content)
 
 ---
@@ -115,15 +115,8 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 
 **Output**:
 - Character dialogue response
-- Potential new clues (extracted from conversation)
+- Potential new clues (extracted from conversation via structured output)
 - Character emotional state update (optional)
-
-**Cache Key**: `character_id + player_clues_hash + time + question_topic`
-
-**Cache Strategy**:
-- Cache for same character + same context (player clues, time)
-- Invalidate when player finds new clues or time advances significantly
-- Store in-memory for session, persistent for save games
 
 **Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per conversation
 
@@ -148,116 +141,45 @@ User Input → LLM 1 (Initializer) → Core Game Structure
 - Potential clues found (if investigating place)
 - Event descriptions (if timeline events occurred)
 
-**Cache Key**: `place_id/character_id + time + player_clues_hash + events_hash`
-
-**Cache Strategy**:
-- Cache for same place/character + same time state
-- Invalidate when time advances or timeline events occur
-- Store in-memory for session, persistent for save games
-
 **Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per investigation
 
 ---
 
-#### LLM 5: Action Handler
+#### Epilogue Generator
 
-**When**: Player performs free-form action
+**When**: Game ends (win or lose)
 
-**Purpose**: Validate and execute player's custom actions
+**Purpose**: Generate epilogue text summarizing the game outcome
 
 **Input**:
-- Action description (player's text input)
-- Current game state
-- Current location
-- Player tools/items
-- Current game time
+- Game state (characters, clues, timeline, outcome)
+- Player's actions and collected clues
+- Win/lose condition
 
 **Output**:
-- Action validation (feasible/not feasible)
-- Action outcome description
-- State changes (if action succeeds)
-- Time cost (if applicable)
+- Epilogue text (narrative summary of the case resolution)
 
-**Cache Key**: `action_hash + game_state_hash` (rarely cached, actions are usually unique)
-
-**Cache Strategy**:
-- Rarely cache (actions are usually unique)
-- Cache common actions (e.g., "look around", "check door")
-- Store in-memory only (not persistent)
-
-**Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per action
+**Estimated Cost**: ~1.2k tokens per call = ~$0.01 per game end
 
 ---
 
-#### LLM 6: Component Updater
-
-**When**: Timeline events trigger or component state needs update
-
-**Purpose**: Update game components based on timeline events and player actions
-
-**Input**:
-- Timeline event data
-- Current game state
-- Affected components (characters, places, clues)
-- Player's recent actions
-
-**Output**:
-- Updated component states:
-  - Character states (mental_state, known_clues, location)
-  - Place states (available_clues, current_characters)
-  - Clue availability (based on unlock_conditions)
-- Narrative for event
-- State change descriptions
-
-**Cache Key**: `event_id + game_state_hash`
-
-**Cache Strategy**:
-- Cache for same event + same state
-- Invalidate when game state changes significantly
-- Store in-memory for session, persistent for save games
-
-**Estimated Cost**: ~2k tokens per call = ~$0.01-0.02 per event
+**Note**: LLM 5 (Action Handler) and LLM 6 (Component Updater) are not implemented. The game uses predefined actions only, and timeline events are processed with basic logic (no LLM-based updates).
 
 ---
 
 ## Caching Strategy
 
-### What to Cache
+**Status**: ❌ Not Implemented
 
-- **Intro** (LLM 2): Introduction text (cached per game)
-- **Dialogue** (LLM 3): Character conversations
-- **Descriptions** (LLM 4): Place/character descriptions
-- **Action Outcomes** (LLM 5): Common actions (rarely)
-- **Component Updates** (LLM 6): Timeline event outcomes
+**Reason**: Caching is inefficient for this game architecture. Each LLM call has unique context:
+- Different game time
+- Different player clues collected
+- Different questions asked
+- Different timeline events
 
-### Cache Key Structure
+Since prompts are unique per context, cache hit rate would be very low, making caching overhead not worthwhile.
 
-```
-LLM 2: "intro:{game_state_hash}" (cached per game)
-LLM 3: "dialogue:{character_id}:{clues_hash}:{time}:{topic}"
-LLM 4: "desc:{place_id}:{time}:{clues_hash}:{events_hash}"
-LLM 5: "action:{action_hash}:{state_hash}"
-LLM 6: "update:{event_id}:{state_hash}"
-```
-
-### Cache Storage
-
-- **In-Memory Cache**: Fast access during session
-  - Use `MutableMap<String, CachedResponse>`
-  - Clear on game restart
-  - Size limit: ~100-200 entries
-
-- **Persistent Cache**: For save games
-  - Store in Room Database
-  - Persist across app restarts
-  - Clear on new game start
-
-### Cache Invalidation
-
-- **Time-based**: When game time advances significantly
-- **Clue-based**: When player finds new clues
-- **Event-based**: When timeline events occur
-- **State-based**: When game state changes significantly
+**Note**: If save/load system is implemented, game state will be persisted, but LLM responses will not be cached.
 
 ---
 
@@ -269,7 +191,8 @@ LLM 6: "update:{event_id}:{state_hash}"
 
 - **LLM 1 (Initializer)**: Use larger model (Solar Pro) for complete structure generation
 - **LLM 2 (Intro Generator)**: Use larger model (Solar Pro) for quality intro text
-- **LLM 3-6 (Runtime)**: Use faster/cheaper model (Solar Plus) for runtime generation
+- **LLM 3-4 (Runtime)**: Use larger model (Solar Pro) for quality dialogue and descriptions
+- **Epilogue Generator**: Use larger model (Solar Pro) for quality epilogue text
 - **Consistency**: Using same model family helps maintain consistency
 
 **Alternatives**: OpenAI GPT-3.5-turbo/GPT-4, Anthropic Claude (fallback)
@@ -296,15 +219,10 @@ LLM 6: "update:{event_id}:{state_hash}"
 - **Format**: JSON with description and found clues
 - **Key**: Reflect time, events, and player's knowledge
 
-#### LLM 5: Action Handler
-- **Focus**: Validation logic, game state awareness, creative outcomes
-- **Format**: JSON with validation, outcome, state changes
-- **Key**: Balance flexibility with game integrity
-
-#### LLM 6: Component Updater
-- **Focus**: State consistency, narrative coherence, logical updates
-- **Format**: JSON with updated components and narrative
-- **Key**: Maintain game logic, reflect timeline events
+#### Epilogue Generator
+- **Focus**: Narrative summary, case resolution, satisfying conclusion
+- **Format**: JSON with epilogue text
+- **Key**: Summarize case, acknowledge player's investigation, provide closure
 
 ### Error Handling
 
@@ -340,13 +258,17 @@ LLM 6: "update:{event_id}:{state_hash}"
 **Intro Generation (LLM 2)**:
 - ~2k tokens = ~$0.01-0.02 per game
 
-**Runtime Generation (LLM 3-6)**:
-- ~30-50 calls × ~2k tokens each = ~$0.30-1.00
-- Caching reduces actual calls by ~30-50%
+**Runtime Generation (LLM 3-4)**:
+- ~20-40 calls × ~2k tokens each = ~$0.20-0.80
+- Dialogue calls: ~15-25 per game
+- Description calls: ~5-15 per game
 
-**Total Estimated Cost**: ~$0.50-1.40 per game session
+**Epilogue Generation**:
+- 1 call × ~1.2k tokens = ~$0.01 per game
 
-*Note: Costs are rough estimates and vary by provider/model. Caching significantly reduces costs.*
+**Total Estimated Cost**: ~$0.40-1.20 per game session
+
+*Note: Costs are rough estimates and vary by provider/model. No caching system - all calls are unique per context.*
 
 ---
 
@@ -366,42 +288,33 @@ LLM 6: "update:{event_id}:{state_hash}"
 │ Runtime Gameplay                                 │
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
-│  │ LLM 2: Dialogue Generator                 │  │
-│  │ - Check cache first                       │  │
+│  │ LLM 3: Dialogue Generator                 │  │
 │  │ - Called when player questions character  │  │
 │  │ - Input: character data, player clues,    │  │
 │  │          context, player question          │  │
 │  │ - Output: dialogue response, new clues    │  │
-│  │ - Cache result                            │  │
 │  └──────────────────────────────────────────┘  │
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
-│  │ LLM 3: Description Generator              │  │
-│  │ - Check cache first                       │  │
+│  │ LLM 4: Description Generator              │  │
 │  │ - Called when player investigates place   │  │
 │  │ - Input: place data, current time,       │  │
 │  │          timeline events, player clues    │  │
 │  │ - Output: place description, clues found  │  │
-│  │ - Cache result                            │  │
 │  └──────────────────────────────────────────┘  │
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
-│  │ LLM 5: Action Handler                    │  │
-│  │ - Called when player performs free action│  │
-│  │ - Input: action description, game state,  │  │
-│  │          current location, player tools   │  │
-│  │ - Output: action validation, outcome,     │  │
-│  │          state changes                    │  │
-│  │ - Cache rarely (actions are unique)     │  │
+│  │ Timeline Event Processing                 │  │
+│  │ - Basic logic (no LLM)                    │  │
+│  │ - Character movement, place changes       │  │
+│  │ - Flag updates                            │  │
 │  └──────────────────────────────────────────┘  │
 │                                                  │
 │  ┌──────────────────────────────────────────┐  │
-│  │ LLM 6: Component Updater                 │  │
-│  │ - Check cache first                       │  │
-│  │ - Called when timeline event triggers    │  │
-│  │ - Input: timeline event, current state   │  │
-│  │ - Output: updated components, narrative  │  │
-│  │ - Cache result                            │  │
+│  │ Epilogue Generator                        │  │
+│  │ - Called when game ends (win/lose)        │  │
+│  │ - Input: game state, outcome              │  │
+│  │ - Output: epilogue text                   │  │
 │  └──────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────┘
 ```
@@ -457,7 +370,12 @@ The **Hybrid Approach** provides the best balance for the detective game:
 - ✅ **Complete game structure** upfront (no gaps, predictable core)
 - ✅ **Dynamic content** on-demand (natural feel, contextual)
 - ✅ **Balanced costs** (manageable initial + focused runtime calls)
-- ✅ **Good performance** (caching reduces API calls)
-- ✅ **Flexible** (can adapt to player actions while maintaining structure)
+- ✅ **Simplified architecture** (no caching complexity, no free actions)
+- ✅ **Playable and fun** (predefined actions are sufficient for engaging gameplay)
 
-This architecture ensures a consistent, engaging user experience while managing costs and complexity effectively.
+**Simplified Features**:
+- ❌ No caching system (prompts are unique per context)
+- ❌ No free-form actions (predefined actions only)
+- ❌ No LLM-based component updates (basic timeline processing sufficient)
+
+This architecture ensures a consistent, engaging user experience while keeping complexity manageable and the game fully playable.

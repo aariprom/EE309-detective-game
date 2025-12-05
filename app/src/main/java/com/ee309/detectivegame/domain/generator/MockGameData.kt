@@ -1,6 +1,6 @@
 package com.ee309.detectivegame.domain.generator
 
-import com.ee309.detectivegame.domain.model.*;
+import com.ee309.detectivegame.domain.model.*
 import kotlinx.serialization.InternalSerializationApi
 
 object MockGameData {
@@ -55,12 +55,13 @@ object MockGameData {
                 unlockConditions = emptyList()
             ),
             Character(
-                id = "char_victim",
-                name = "Victim",
+                id = "char_george",
+                name = "George",
                 traits = emptyList(),
                 hidden = true,
                 currentLocation = "place_office",
-                unlockConditions = listOf("found_clue_1")
+                unlockConditions = listOf("found_clue_1"),
+                isVictim = true
             )
         )
     }

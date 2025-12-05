@@ -41,8 +41,8 @@ android {
         applicationId = "com.ee309.detectivegame"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
 
         // testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // override above by hilt test runner
@@ -111,6 +111,7 @@ dependencies {
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.10.0")
 
     // Hilt
     implementation("com.google.dagger:hilt-android:2.57.2")

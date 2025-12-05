@@ -70,6 +70,20 @@ object LLMResponseProcessor {
             Result.failure(Exception(ValidationError.JsonParseError("JSON parsing failed: ${e.message}").message))
         }
     }
+
+    /**
+     * Removes simple markdown code fences (``` or ```json) from a response string.
+     */
+    private fun stripCodeFences(raw: String): String {
+        if (!raw.startsWith("```")) return raw
+        val withoutFirstLine = raw
+            .removePrefix("```json")
+            .removePrefix("```JSON")
+            .removePrefix("```")
+        return withoutFirstLine
+            .removeSuffix("```")
+            .trim()
+    }
     
     /**
      * Processor for LLM 1: GameInitializer
@@ -95,6 +109,15 @@ object LLMResponseProcessor {
             ) : ValidationError(message)
             data class NoCriminal(override val message: String = "No criminal found in game data") : ValidationError(message)
             data class MultipleCriminals(override val message: String = "Multiple criminals found in game data") : ValidationError(message)
+            data class MissingVictim(
+                override val message: String = "No victim found in game data"
+            ) : ValidationError(message)
+            data class MultipleVictims(
+                override val message: String = "Multiple victims found in game data"
+            ) : ValidationError(message)
+            data class VictimIsCriminal(
+                override val message: String = "Victim cannot be the criminal"
+            ) : ValidationError(message)
             data class InvalidTimeline(
                 override val message: String = "Timeline is invalid: startTime must be before endTime"
             ) : ValidationError(message)
@@ -190,6 +213,20 @@ object LLMResponseProcessor {
                     "Found ${criminals.size} criminals: ${criminals.joinToString { it.id }}"
                 ))
             }
+
+            // Validate exactly one victim exists
+            val victims = gameState.characters.filter { it.isVictim }
+            when {
+                victims.isEmpty() -> errors.add(ValidationError.MissingVictim())
+                victims.size > 1 -> errors.add(ValidationError.MultipleVictims())
+            }
+
+            // Victim cannot be the criminal
+            val victimAndCriminal = gameState.characters.firstOrNull { it.isVictim && it.isCriminal }
+            if (victimAndCriminal != null) {
+                errors.add(ValidationError.VictimIsCriminal())
+            }
+
             
             // Validate timeline structure - all times are absolute
             val timeline = gameState.timeline
@@ -297,11 +334,14 @@ object LLMResponseProcessor {
                 )
             }
             
+            // Pre-clean: strip common markdown fences
+            val cleanedResponse = stripCodeFences(rawResponse.trim())
+            
             // Parse JSON response
-            val parseResult = LLMResponseProcessor.parseJson(rawResponse, IntroResponse.serializer())
+            val parseResult = LLMResponseProcessor.parseJson(cleanedResponse, IntroResponse.serializer())
             val introResponse = parseResult.getOrElse { exception ->
                 // If JSON parsing fails, try to treat as plain text (fallback)
-                val fallbackText = rawResponse.trim()
+                val fallbackText = cleanedResponse
                 val validationErrors = validate(fallbackText)
                 if (validationErrors.isEmpty()) {
                     return ProcessingResult.Success(fallbackText)
@@ -497,6 +537,70 @@ object LLMResponseProcessor {
             }
             
             return errors
+        }
+    }
+
+    /**
+     * Processor for LLM 4: DescriptionGenerator
+     */
+    object DescriptionGenerator {
+        sealed class ValidationError(override val message: String) : LLMResponseProcessor.ValidationError(message) {
+            data class EmptyText(override val message: String = "Description text is empty") : ValidationError(message)
+        }
+
+        @OptIn(InternalSerializationApi::class)
+        fun process(rawResponse: String): ProcessingResult<String> {
+            if (rawResponse.isBlank()) {
+                return ProcessingResult.Failure(ValidationError.EmptyText())
+            }
+            val cleaned = stripCodeFences(rawResponse.trim())
+            val parseResult = parseJson(cleaned, com.ee309.detectivegame.llm.model.DescriptionResponse.serializer())
+            val descriptionResponse = parseResult.getOrElse { exception ->
+                val fallback = cleaned
+                if (fallback.isNotBlank()) {
+                    return ProcessingResult.Success(fallback)
+                }
+                return ProcessingResult.Failure(
+                    ValidationError.EmptyText(exception.message ?: "Description parse error")
+                )
+            }
+            val text = descriptionResponse.text.trim()
+            if (text.isBlank()) {
+                return ProcessingResult.Failure(ValidationError.EmptyText())
+            }
+            return ProcessingResult.Success(text)
+        }
+    }
+
+    /**
+     * Processor for LLM 5: EpilogueGenerator
+     */
+    object EpilogueGenerator {
+        sealed class ValidationError(override val message: String) : LLMResponseProcessor.ValidationError(message) {
+            data class EmptyText(override val message: String = "Epilogue text is empty") : ValidationError(message)
+        }
+
+        @OptIn(InternalSerializationApi::class)
+        fun process(rawResponse: String): ProcessingResult<String> {
+            if (rawResponse.isBlank()) {
+                return ProcessingResult.Failure(ValidationError.EmptyText())
+            }
+            val cleaned = stripCodeFences(rawResponse.trim())
+            val parseResult = parseJson(cleaned, com.ee309.detectivegame.llm.model.EpilogueResponse.serializer())
+            val epilogueResponse = parseResult.getOrElse { exception ->
+                val fallback = cleaned
+                if (fallback.isNotBlank()) {
+                    return ProcessingResult.Success(fallback)
+                }
+                return ProcessingResult.Failure(
+                    ValidationError.EmptyText(exception.message ?: "Epilogue parse error")
+                )
+            }
+            val text = epilogueResponse.text.trim()
+            if (text.isBlank()) {
+                return ProcessingResult.Failure(ValidationError.EmptyText())
+            }
+            return ProcessingResult.Success(text)
         }
     }
 }
