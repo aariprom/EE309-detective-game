@@ -11,7 +11,8 @@ data class EpilogueRequest(
     val victim: VictimInfo,
     val player: PlayerInfoEpilogue,
     val language: String = "en",
-    val outcome: String = "WIN"
+    val outcome: String = "WIN",
+    val lossReason: String? = null  // "TIMEOUT" or "FALSE_ACCUSATION" when outcome is "LOSE"
 )
 
 @Serializable
@@ -74,6 +75,7 @@ fun GameState.toEpilogueRequest(language: String = "en"): EpilogueRequest {
             role = "Detective"
         ),
         language = lang,
-        outcome = if (phase == com.ee309.detectivegame.domain.model.GamePhase.WIN) "WIN" else "LOSE"
+        outcome = if (phase == com.ee309.detectivegame.domain.model.GamePhase.WIN) "WIN" else "LOSE",
+        lossReason = lossReason?.name  // Convert enum to string (TIMEOUT or FALSE_ACCUSATION)
     )
 }

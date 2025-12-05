@@ -25,7 +25,8 @@ data class GameState(
         startTime = GameTime(1080), // 18:00 (6 PM) - absolute time when game starts
         endTime = GameTime(1560)    // 26:00 - extended absolute time when game ends
     ),
-    val flags: Map<String, Boolean> = emptyMap()
+    val flags: Map<String, Boolean> = emptyMap(),
+    val lossReason: LossReason? = null  // Only set when phase is LOSE
 ) {
     /**
      * Retrieves a character by its ID.

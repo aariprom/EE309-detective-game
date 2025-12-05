@@ -21,8 +21,9 @@ The project is divided into 5 main modules:
 1. **Core Game Engine & State Management** - Foundation for game state and flow
 2. **LLM Integration Layer (Hybrid Architecture)** - Interface with LLM for content generation
    - **LLM 1**: Initial content generator (upfront generation)
-   - **LLM 2-5**: Runtime generators (dialogue, descriptions, actions, updates)
-   - **Caching**: Performance optimization
+   - **LLM 2**: Intro generator (introduction text)
+   - **LLM 3-4**: Runtime generators (dialogue, descriptions)
+   - **Epilogue Generator**: Game ending text
 3. **Game Content System** - Management of characters, places, clues, and timeline
 4. **Android UI/UX Components** - User interface and interaction
 5. **Game Logic & Validation System** - Game rules and action handling
