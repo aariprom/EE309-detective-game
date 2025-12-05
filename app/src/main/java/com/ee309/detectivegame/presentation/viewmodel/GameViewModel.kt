@@ -1,5 +1,6 @@
 package com.ee309.detectivegame.presentation.viewmodel
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ee309.detectivegame.domain.model.GameState
@@ -17,6 +18,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import com.ee309.detectivegame.ui.compose.ConversationMessage
 import com.ee309.detectivegame.ui.compose.ConversationMessageType
 import com.ee309.detectivegame.domain.model.ActionTimeCosts
@@ -27,11 +31,13 @@ import com.ee309.detectivegame.llm.model.DescriptionRequest
 import com.ee309.detectivegame.llm.model.EpilogueRequest
 import com.ee309.detectivegame.llm.model.toDescriptionRequest
 import com.ee309.detectivegame.llm.model.toEpilogueRequest
+import kotlinx.serialization.serializer
 import javax.inject.Inject
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
-    private val llmRepository: LLMRepository
+    private val llmRepository: LLMRepository,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
@@ -63,10 +69,140 @@ class GameViewModel @Inject constructor(
         prettyPrint = false
     }
     
+    // Keys for SavedStateHandle
+    private companion object {
+        const val KEY_GAME_STATE = "game_state"
+        const val KEY_CONVERSATION_HISTORY = "conversation_history"
+        const val KEY_INTRO_TEXT = "intro_text"
+        const val KEY_INTRO_SHOWN = "intro_shown"
+        const val KEY_PLACE_DESCRIPTIONS = "place_descriptions"
+        const val KEY_EPILOGUE_TEXT = "epilogue_text"
+    }
+    
     init {
-        // GameUIState Error with empty message indicates initial state
-        // TODO: Make a distinct UI state for very first initialization
-        _uiState.value = GameUiState.Error("")
+        // Restore state from SavedStateHandle if available
+        restoreState()
+        
+        // If no saved state, set initial state
+        if (_gameState.value == null) {
+            _uiState.value = GameUiState.Error("")
+        }
+    }
+    
+    /**
+     * Restores game state from SavedStateHandle.
+     * Called during ViewModel initialization to recover from process death.
+     */
+    @OptIn(InternalSerializationApi::class)
+    private fun restoreState() {
+        try {
+            // Restore GameState
+            val gameStateJson = savedStateHandle.get<String>(KEY_GAME_STATE)
+            if (gameStateJson != null) {
+                val gameState = json.decodeFromString(GameState.serializer(), gameStateJson)
+                _gameState.value = gameState
+                _uiState.value = GameUiState.Success(gameState)
+            }
+            
+            // Restore conversation history
+            val conversationHistoryJson = savedStateHandle.get<String>(KEY_CONVERSATION_HISTORY)
+            if (conversationHistoryJson != null) {
+                val history = json.decodeFromString<Map<String, List<ConversationMessage>>>(
+                    MapSerializer(
+                        serializer<String>(),
+                        ListSerializer(ConversationMessage.serializer())
+                    ),
+                    conversationHistoryJson
+                )
+                _conversationHistory.value = history
+            }
+            
+            // Restore intro text
+            _introText.value = savedStateHandle.get<String>(KEY_INTRO_TEXT)
+            
+            // Restore intro shown flag
+            _introShown.value = savedStateHandle.get<Boolean>(KEY_INTRO_SHOWN) ?: false
+            
+            // Restore place descriptions
+            val placeDescriptionsJson = savedStateHandle.get<String>(KEY_PLACE_DESCRIPTIONS)
+            if (placeDescriptionsJson != null) {
+                val descriptions = json.decodeFromString(
+                    MapSerializer(
+                        serializer<String>(),
+                        serializer<String>()
+                    ),
+                    placeDescriptionsJson
+                )
+                _placeDescriptions.value = descriptions
+            }
+            
+            // Restore epilogue text
+            _epilogueText.value = savedStateHandle.get<String>(KEY_EPILOGUE_TEXT)
+        } catch (e: Exception) {
+            // If restoration fails, start fresh
+            // Log error but don't crash
+            println("Failed to restore state: ${e.message}")
+        }
+    }
+    
+    /**
+     * Saves current game state to SavedStateHandle.
+     * Called whenever state changes to persist across process death.
+     */
+    @OptIn(InternalSerializationApi::class)
+    private fun saveState() {
+        try {
+            // Save GameState
+            val gameState = _gameState.value
+            if (gameState != null) {
+                val gameStateJson = json.encodeToString(GameState.serializer(), gameState)
+                savedStateHandle[KEY_GAME_STATE] = gameStateJson
+            } else {
+                savedStateHandle.remove<String>(KEY_GAME_STATE)
+            }
+            
+            // Save conversation history
+            val conversationHistory = _conversationHistory.value
+            if (conversationHistory.isNotEmpty()) {
+                val historyJson = json.encodeToString(
+                    MapSerializer(
+                        serializer<String>(),
+                        ListSerializer(ConversationMessage.serializer())
+                    ),
+                    conversationHistory
+                )
+                savedStateHandle[KEY_CONVERSATION_HISTORY] = historyJson
+            } else {
+                savedStateHandle.remove<String>(KEY_CONVERSATION_HISTORY)
+            }
+            
+            // Save intro text
+            savedStateHandle[KEY_INTRO_TEXT] = _introText.value
+            
+            // Save intro shown flag
+            savedStateHandle[KEY_INTRO_SHOWN] = _introShown.value
+            
+            // Save place descriptions
+            val placeDescriptions = _placeDescriptions.value
+            if (placeDescriptions.isNotEmpty()) {
+                val descriptionsJson = json.encodeToString(
+                    MapSerializer(
+                        serializer<String>(),
+                        serializer<String>()
+                    ),
+                    placeDescriptions
+                )
+                savedStateHandle[KEY_PLACE_DESCRIPTIONS] = descriptionsJson
+            } else {
+                savedStateHandle.remove<String>(KEY_PLACE_DESCRIPTIONS)
+            }
+            
+            // Save epilogue text
+            savedStateHandle[KEY_EPILOGUE_TEXT] = _epilogueText.value
+        } catch (e: Exception) {
+            // Log error but don't crash - state saving is best-effort
+            println("Failed to save state: ${e.message}")
+        }
     }
     
     /**
@@ -82,6 +218,7 @@ class GameViewModel @Inject constructor(
         _placeDescriptions.value = emptyMap()
         _epilogueText.value = null
         _dialogueLoading.value = emptyMap()
+        saveState() // Clear saved state
     }
     
     fun startNewGame(keywords: String) {
@@ -124,6 +261,7 @@ class GameViewModel @Inject constructor(
                 
                 // Store game state (but don't show main game yet - need intro first)
                 _gameState.value = gameState
+                saveState() // Save game state
                 
                 // Preload description for starting location (best-effort)
                 fetchPlaceDescription(gameState)
@@ -155,6 +293,7 @@ class GameViewModel @Inject constructor(
                 when (introResult) {
                     is LLMResponseProcessor.ProcessingResult.Success -> {
                         _introText.value = introResult.data
+                        saveState() // Save intro text
                         // Keep UI in Loading state - IntroScreen will handle display
                         // The game state is set, but intro needs to be shown first
                     }
@@ -167,6 +306,7 @@ class GameViewModel @Inject constructor(
                         // Mark intro as shown so game can start
                         _introShown.value = true
                         _uiState.value = GameUiState.Success(gameState)
+                        saveState() // Save state
                     }
                 }
             } catch (e: Exception) {
@@ -186,6 +326,7 @@ class GameViewModel @Inject constructor(
         if (currentGameState != null) {
             _uiState.value = GameUiState.Success(currentGameState)
         }
+        saveState() // Save intro shown flag
     }
     
     fun executeAction(action: GameAction) {
@@ -247,6 +388,7 @@ class GameViewModel @Inject constructor(
             }
             _gameState.value = newState
             _uiState.value = GameUiState.Success(newState)
+            saveState() // Save phase transition
 
             if (phase == GamePhase.WIN || phase == GamePhase.LOSE) {
                 generateEpilogue(newState)
@@ -299,6 +441,7 @@ class GameViewModel @Inject constructor(
     private fun updateGameState(newState: GameState) {
         _gameState.value = newState
         _uiState.value = GameUiState.Success(newState)
+        saveState() // Save game state update
     }
 
     @OptIn(InternalSerializationApi::class)
@@ -658,6 +801,7 @@ class GameViewModel @Inject constructor(
         val currentHistory = _conversationHistory.value
         val characterHistory = currentHistory[characterId] ?: emptyList()
         _conversationHistory.value = currentHistory + (characterId to (characterHistory + message))
+        saveState() // Save conversation history
     }
     
     /**
@@ -705,6 +849,7 @@ class GameViewModel @Inject constructor(
 
             if (descriptionText.isNotBlank()) {
                 _placeDescriptions.value = _placeDescriptions.value + (placeId to descriptionText)
+                saveState() // Save place description
             }
         }
     }
@@ -731,6 +876,7 @@ class GameViewModel @Inject constructor(
             }
 
             _epilogueText.value = epilogue
+            saveState() // Save epilogue text
         }
     }
 

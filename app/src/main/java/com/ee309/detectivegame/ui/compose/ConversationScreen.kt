@@ -184,6 +184,7 @@ fun ConversationScreen(
 /**
  * Represents a message in a conversation.
  */
+@kotlinx.serialization.Serializable
 data class ConversationMessage(
     val text: String,
     val isFromPlayer: Boolean,
@@ -194,6 +195,7 @@ data class ConversationMessage(
 /**
  * Type of conversation message
  */
+@kotlinx.serialization.Serializable
 enum class ConversationMessageType {
     NORMAL,  // Regular player/character messages
     SYSTEM   // Game state change notifications
