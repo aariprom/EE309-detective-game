@@ -56,6 +56,22 @@ android {
         buildConfigField("String", "UPSTAGE_BASE_URL", localProperties.getProperty("UPSTAGE_BASE_URL", "\"${upstageBaseUrl}\""))
     }
 
+    // Signing configuration for release builds (used by GitHub Actions)
+    signingConfigs {
+        create("release") {
+            val keystoreFilePath = loadEnv("KEYSTORE_FILE")
+            if (!keystoreFilePath.isNullOrEmpty()) {
+                val keystoreFile = rootProject.file(keystoreFilePath)
+                if (keystoreFile.exists()) {
+                    storeFile = keystoreFile
+                    storePassword = loadEnv("KEYSTORE_PASSWORD") ?: ""
+                    keyAlias = loadEnv("KEY_ALIAS") ?: ""
+                    keyPassword = loadEnv("KEY_PASSWORD") ?: ""
+                }
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -63,6 +79,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Apply release signing config if keystore is available
+            val releaseSigningConfig = signingConfigs.findByName("release")
+            if (releaseSigningConfig?.storeFile != null) {
+                signingConfig = releaseSigningConfig
+            }
         }
         debug {
             // 🔴 문제였던 내장 유닛 테스트 커버리지는 비활성화
